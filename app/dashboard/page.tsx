@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, getOrCreateLog, getActivities, saveActivity, deleteActivity, updateActivity, updateLogSummary, updateLogWorking, getProfile } from '@/lib/supabase'
 import type { Activity, SalesLog, Profile } from '@/lib/supabase'
@@ -20,6 +20,110 @@ const TYPE_STYLE: Record<string, { bg: string; text: string; icon: string }> = {
 }
 
 function toDateStr(d: Date) { return d.toISOString().split('T')[0] }
+
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=kr`,
+      { headers: { 'User-Agent': 'SalesTracker/1.0 (ppllmm0808@gmail.com)' } }
+    )
+    const data = await res.json()
+    if (data && data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+  } catch {}
+  return null
+}
+
+function MapPanel({ activities }: { activities: Activity[] }) {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<any>(null)
+  const withCoords = activities.filter(a => a.lat && a.lng)
+
+  useEffect(() => {
+    if (!mapRef.current) return
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link')
+      link.id = 'leaflet-css'
+      link.rel = 'stylesheet'
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+      document.head.appendChild(link)
+    }
+    const initMap = () => {
+      const L = (window as any).L
+      if (!mapRef.current) return
+      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null }
+      const map = L.map(mapRef.current).setView([37.5665, 126.9780], 12)
+      mapInstanceRef.current = map
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>'
+      }).addTo(map)
+      const pts = activities.filter(a => a.lat && a.lng)
+      if (pts.length > 0) {
+        const bounds = L.latLngBounds(pts.map(a => [a.lat!, a.lng!]))
+        map.fitBounds(bounds, { padding: [50, 50] })
+        pts.forEach((act, i) => {
+          const s = TYPE_STYLE[act.activity_type] || TYPE_STYLE['기타']
+          const icon = L.divIcon({
+            className: '',
+            html: `<div style="background:${s.text};color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer">${i + 1}</div>`,
+            iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -16],
+          })
+          L.marker([act.lat!, act.lng!], { icon }).addTo(map).bindPopup(`
+            <div style="min-width:180px;font-family:system-ui;font-size:13px">
+              <div style="font-weight:700;margin-bottom:4px;color:#1e293b">${i + 1}. ${act.activity_time}${act.end_time ? '~' + act.end_time : ''} [${act.activity_type}]</div>
+              ${act.company ? `<div style="font-weight:600;color:#0f172a">${act.company}</div>` : ''}
+              ${act.address ? `<div style="color:#64748b;font-size:12px;margin-top:2px">📍 ${act.address}</div>` : ''}
+              ${act.contact ? `<div style="color:#64748b;font-size:12px">👤 ${act.contact}</div>` : ''}
+              ${act.content ? `<div style="margin-top:6px;color:#334155">${act.content}</div>` : ''}
+              ${act.result ? `<div style="color:#059669;margin-top:4px">✅ ${act.result}</div>` : ''}
+              ${act.next_action ? `<div style="color:#4338ca;margin-top:4px">➡️ ${act.next_action}</div>` : ''}
+            </div>
+          `)
+        })
+        if (pts.length > 1) {
+          const line = L.polyline(pts.map(a => [a.lat!, a.lng!]), { color: '#4f46e5', weight: 2, opacity: 0.5, dashArray: '6,4' }).addTo(map)
+        }
+      }
+    }
+    if ((window as any).L) { initMap(); return }
+    if (!document.getElementById('leaflet-js')) {
+      const script = document.createElement('script')
+      script.id = 'leaflet-js'
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+      script.onload = initMap
+      document.head.appendChild(script)
+    } else {
+      const wait = setInterval(() => { if ((window as any).L) { clearInterval(wait); initMap() } }, 100)
+    }
+    return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null } }
+  }, [activities])
+
+  if (withCoords.length === 0) return (
+    <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
+      <p style={{ fontSize: 40 }}>🗺️</p>
+      <p style={{ marginTop: 8, fontWeight: 600, color: '#64748b' }}>지도에 표시할 위치가 없습니다</p>
+      <p style={{ fontSize: 13, marginTop: 4 }}>활동 등록 시 주소를 입력하면 자동으로 지도에 표시됩니다</p>
+    </div>
+  )
+
+  return (
+    <div>
+      <div ref={mapRef} style={{ height: 420, borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0' }} />
+      <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {withCoords.map((act, i) => {
+          const s = TYPE_STYLE[act.activity_type] || TYPE_STYLE['기타']
+          return (
+            <div key={act.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}>
+              <span style={{ background: s.text, color: '#fff', width: 18, height: 18, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+              <span style={{ color: '#334155', fontWeight: 600 }}>{act.activity_time}</span>
+              <span style={{ color: s.text, fontWeight: 600 }}>{act.activity_type}</span>
+              <span style={{ color: '#64748b' }}>{act.company || act.address}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 function calcWorkHours(acts: Activity[]) {
   if (!acts.length) return '0시간'
@@ -43,6 +147,7 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState(toDateStr(new Date()))
   const [showModal, setShowModal] = useState(false)
   const [editTarget, setEditTarget] = useState<Activity | null>(null)
+  const [viewMode, setViewMode] = useState<'timeline' | 'map'>('timeline')
   const [form, setForm] = useState({
     activity_time: '', end_time: '', activity_type: '미팅',
     company: '', contact: '', address: '', content: '', result: '', next_action: '',
@@ -87,6 +192,8 @@ export default function Dashboard() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!log || !profile) return
+    let coords: { lat: number; lng: number } | null = null
+    if (form.address) coords = await geocodeAddress(form.address)
     if (editTarget) {
       await updateActivity(editTarget.id, {
         activity_time: form.activity_time, end_time: form.end_time || null,
@@ -94,6 +201,7 @@ export default function Dashboard() {
         contact: form.contact || null, address: form.address || null,
         content: form.content || null, result: form.result || null,
         next_action: form.next_action || null,
+        ...(form.address ? { lat: coords?.lat ?? null, lng: coords?.lng ?? null } : {}),
       })
     } else {
       await saveActivity({
@@ -103,7 +211,7 @@ export default function Dashboard() {
         contact: form.contact || null, address: form.address || null,
         content: form.content || null, result: form.result || null,
         next_action: form.next_action || null,
-        lat: null, lng: null,
+        lat: coords?.lat ?? null, lng: coords?.lng ?? null,
       })
     }
     setShowModal(false)
@@ -277,8 +385,28 @@ export default function Dashboard() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ ...card, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 16, color: '#1e293b' }}>8시간 근무 타임라인 (09:00 - 18:00)</div>
-              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>시간대별 위치 및 활동 내역을 순서대로 관리합니다.</div>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                <button onClick={() => setViewMode('timeline')} style={{
+                  padding: '5px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none',
+                  background: viewMode === 'timeline' ? '#4f46e5' : '#f1f5f9',
+                  color: viewMode === 'timeline' ? '#fff' : '#64748b',
+                }}>📋 타임라인</button>
+                <button onClick={() => setViewMode('map')} style={{
+                  padding: '5px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none',
+                  background: viewMode === 'map' ? '#4f46e5' : '#f1f5f9',
+                  color: viewMode === 'map' ? '#fff' : '#64748b',
+                }}>
+                  🗺️ 지도
+                  {activities.filter(a => a.lat && a.lng).length > 0 &&
+                    <span style={{ marginLeft: 6, background: '#22c55e', color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 11 }}>
+                      {activities.filter(a => a.lat && a.lng).length}
+                    </span>
+                  }
+                </button>
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>
+                {viewMode === 'timeline' ? '시간대별 활동 내역을 순서대로 관리합니다.' : '주소 입력 시 자동으로 지도에 핀이 표시됩니다.'}
+              </div>
             </div>
             <button onClick={async () => {
               if (!confirm('전체 삭제하시겠습니까?')) return
@@ -289,7 +417,14 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {!log?.is_working && (
+          {/* Map View */}
+          {viewMode === 'map' && log?.is_working && (
+            <div style={card}>
+              <MapPanel activities={sorted} />
+            </div>
+          )}
+
+          {viewMode === 'timeline' && !log?.is_working && (
             <div style={{ textAlign: 'center', padding: '40px 0', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 16 }}>
               <p style={{ fontSize: 32 }}>🏖️</p>
               <p style={{ color: '#dc2626', fontWeight: 600, marginTop: 8 }}>휴무일</p>
@@ -298,14 +433,14 @@ export default function Dashboard() {
             </div>
           )}
 
-          {log?.is_working && sorted.length === 0 && (
+          {viewMode === 'timeline' && log?.is_working && sorted.length === 0 && (
             <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
               <p style={{ fontSize: 40 }}>📋</p>
               <p style={{ marginTop: 8 }}>오늘의 활동을 기록하세요</p>
             </div>
           )}
 
-          {log?.is_working && sorted.map((act) => {
+          {viewMode === 'timeline' && log?.is_working && sorted.map((act) => {
             const style = TYPE_STYLE[act.activity_type] || TYPE_STYLE['기타']
             return (
               <div key={act.id} style={{ ...card, display: 'flex', gap: 16 }}>
