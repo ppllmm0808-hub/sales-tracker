@@ -1,0 +1,10 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 512 512'>
+  <rect width='512' height='512' rx='102.4' fill='#0f172a'/>
+  <rect x='102.4' y='76.8' width='307.2' height='358.4' rx='30.72' fill='white' opacity='0.95'/>
+  <rect x='153.6' y='143.36' width='204.8' height='25.6' rx='2' fill='#4f46e5'/>
+  <rect x='153.6' y='194.56' width='204.8' height='25.6' rx='2' fill='#94a3b8'/>
+  <rect x='153.6' y='245.76' width='153.6' height='25.6' rx='2' fill='#94a3b8'/>
+  <rect x='153.6' y='296.96' width='179.2' height='25.6' rx='2' fill='#94a3b8'/>
+  <circle cx='368.64' cy='368.64' r='71.68' fill='#4f46e5'/>
+  <text x='368.64' y='394.24' text-anchor='middle' fill='white' font-size='71.68' font-family='system-ui'>✓</text>
+</svg>
