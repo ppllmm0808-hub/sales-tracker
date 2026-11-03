@@ -334,6 +334,8 @@ export default function AdminPage() {
   const [editForm, setEditForm] = useState({ name: '', role: 'member', password: '' })
   const [userLoading, setUserLoading] = useState(false)
   const [userMsg, setUserMsg] = useState('')
+  const [inviteLink, setInviteLink] = useState('')
+  const [linkCopied, setLinkCopied] = useState(false)
   const [exportStart, setExportStart] = useState(() => {
     const d = new Date(); d.setDate(1); return toDateStr(d)
   })
@@ -641,13 +643,30 @@ export default function AdminPage() {
                   {userLoading ? '처리 중...' : '📧 초대 메일 발송'}
                 </button>
               </form>
-              <div style={{ marginTop: 20, padding: 14, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, fontSize: 12, color: '#065f46', lineHeight: 1.8 }}>
-                <b>초대 방식 안내</b><br />
-                1. 관리자가 이름+이메일 입력 후 초대 발송<br />
-                2. 담당자 이메일로 초대 링크 도착<br />
-                3. 링크 클릭 → <b>본인이 직접 비밀번호 설정</b><br />
-                4. 이후 이메일+비밀번호로 로그인<br />
-                <span style={{ color: '#94a3b8', fontSize: 11 }}>초대받지 않은 사람은 접근 불가</span>
+              {/* 앱 주소 공유 */}
+              <div style={{ marginTop: 16, padding: 16, background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 8 }}>📲 앱 주소 카톡으로 공유</div>
+                <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 10, lineHeight: 1.7 }}>
+                  1. 아래 주소 복사 → 카톡으로 전송<br />
+                  2. 담당자가 주소 접속 → 로그인 화면<br />
+                  3. <b>비밀번호를 모르시나요?</b> 클릭<br />
+                  4. 이메일 입력 → 비밀번호 설정 메일 발송<br />
+                  5. 메일 링크 클릭 → 비밀번호 직접 설정
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ flex: 1, background: '#fff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {typeof window !== 'undefined' ? `${window.location.origin}/login` : '/login'}
+                  </div>
+                  <button onClick={() => {
+                    const url = `${window.location.origin}/login`
+                    navigator.clipboard.writeText(url).then(() => {
+                      setUserMsg('✅ 주소가 복사됐습니다! 카톡에 붙여넣기 하세요.')
+                      setTimeout(() => setUserMsg(''), 3000)
+                    })
+                  }} style={{ background: '#0284c7', border: 'none', borderRadius: 8, padding: '8px 14px', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    🔗 복사
+                  </button>
+                </div>
               </div>
             </div>
 
