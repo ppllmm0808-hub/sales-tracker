@@ -299,7 +299,7 @@ export default function AdminPage() {
                   <select value={userForm.role} onChange={e => setUserForm(p => ({ ...p, role: e.target.value }))}
                     style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 14, color: '#1e293b' }}>
                     <option value="member">담당자 (일반)</option>
-                    <option value="admin">관리자</option>
+                    <option value="admin">관리자 👑 (최고 관리자 승인 필요)</option>
                   </select>
                 </label>
                 {userMsg && <p style={{ fontSize: 13, color: userMsg.startsWith('✅') ? '#059669' : '#dc2626' }}>{userMsg}</p>}
@@ -330,7 +330,7 @@ export default function AdminPage() {
                         </div>
                         <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))} style={iStyle}>
                           <option value="member">담당자</option>
-                          <option value="admin">관리자</option>
+                          <option value="admin">관리자 👑 (최고 관리자만 가능)</option>
                         </select>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button type="submit" disabled={userLoading} style={{ flex: 1, background: '#4f46e5', border: 'none', borderRadius: 8, padding: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>저장</button>
