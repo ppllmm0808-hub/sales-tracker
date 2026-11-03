@@ -215,6 +215,13 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
+  // 마운트 시 오늘 날짜 강제 동기화 (캐시된 앱에서 날짜 고착 방지)
+  useEffect(() => {
+    const today = toDateStr(new Date())
+    selectedDateRef.current = today
+    setSelectedDate(today)
+  }, [])
+
   // 날짜 자동 전환: 1분마다 + 화면 복귀 시 체크
   useEffect(() => {
     if (!profile) return
