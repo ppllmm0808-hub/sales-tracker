@@ -20,6 +20,10 @@ export interface SalesLog {
   summary: string | null
   weather: string | null
   is_working: boolean
+  check_in_time: string | null
+  check_in_lat: number | null
+  check_in_lng: number | null
+  check_in_address: string | null
   created_at: string
   updated_at: string
   profiles?: Profile
@@ -84,6 +88,11 @@ export async function updateLogSummary(logId: string, summary: string): Promise<
 export async function updateLogWorking(logId: string, is_working: boolean): Promise<void> {
   await supabase.from('sales_logs')
     .update({ is_working, updated_at: new Date().toISOString() }).eq('id', logId)
+}
+
+export async function checkInLog(logId: string, time: string, lat: number, lng: number, address: string): Promise<void> {
+  await supabase.from('sales_logs')
+    .update({ check_in_time: time, check_in_lat: lat, check_in_lng: lng, check_in_address: address, updated_at: new Date().toISOString() }).eq('id', logId)
 }
 
 export async function getAllLogsForDate(date: string): Promise<SalesLog[]> {

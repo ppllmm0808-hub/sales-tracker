@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase, getOrCreateLog, getActivities, saveActivity, deleteActivity, updateActivity, updateLogSummary, updateLogWorking, getProfile } from '@/lib/supabase'
+import { supabase, getOrCreateLog, getActivities, saveActivity, deleteActivity, updateActivity, updateLogSummary, updateLogWorking, checkInLog, getProfile } from '@/lib/supabase'
 import type { Activity, SalesLog, Profile } from '@/lib/supabase'
 
 const ACTIVITY_TYPES = ['내근', '이동', '미팅', '식사', '방문', '전화', '이메일', '제안', '계약', '기타']
@@ -150,6 +150,7 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState<'timeline' | 'map'>('timeline')
   const [gpsLoading, setGpsLoading] = useState(false)
   const [formCoords, setFormCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [checkInLoading, setCheckInLoading] = useState(false)
   const [form, setForm] = useState({
     activity_time: '', end_time: '', activity_type: '미팅',
     company: '', contact: '', address: '', content: '', result: '', next_action: '',
@@ -253,6 +254,35 @@ export default function Dashboard() {
     if (profile) await load(profile.id, selectedDate)
   }
 
+  async function handleCheckIn() {
+    if (!log) return
+    if (log.check_in_time && !confirm(`이미 ${log.check_in_time}에 체크인했습니다.\n다시 체크인 하시겠습니까?`)) return
+    if (!navigator.geolocation) { alert('GPS를 지원하지 않는 브라우저입니다.'); return }
+    setCheckInLoading(true)
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude: lat, longitude: lng } = pos.coords
+      const now = new Date()
+      const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      let address = `위도 ${lat.toFixed(5)}, 경도 ${lng.toFixed(5)}`
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ko`, { headers: { 'User-Agent': 'SalesTracker/1.0' } })
+        const data = await res.json()
+        if (data?.address) {
+          const a = data.address
+          address = [a.road, a.quarter || a.suburb, a.city_district || a.borough, a.city || a.county].filter(Boolean).join(' ') || data.display_name.split(',').slice(0, 3).join(',').trim()
+        }
+      } catch {}
+      await checkInLog(log.id, time, lat, lng, address)
+      setLog(prev => prev ? { ...prev, check_in_time: time, check_in_lat: lat, check_in_lng: lng, check_in_address: address } : prev)
+      setCheckInLoading(false)
+      alert(`✅ 출근 체크인 완료!\n시간: ${time}\n위치: ${address}`)
+    }, (err) => {
+      setCheckInLoading(false)
+      if (err.code === 1) alert('위치 권한을 허용해주세요.\n브라우저 주소창 왼쪽 자물쇠 아이콘을 클릭하세요.')
+      else alert('GPS 위치를 가져올 수 없습니다.')
+    }, { enableHighAccuracy: true, timeout: 10000 })
+  }
+
   async function handleToggleWorking() {
     if (!log) return
     const next = !log.is_working
@@ -324,6 +354,59 @@ export default function Dashboard() {
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20 }}>
         {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Check-in Card */}
+          <div style={{
+            background: log?.check_in_time
+              ? 'linear-gradient(135deg, #065f46 0%, #047857 100%)'
+              : 'linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%)',
+            borderRadius: 16, padding: 20, color: '#fff',
+          }}>
+            {log?.check_in_time ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 24 }}>✅</span>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>출근 완료</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{log.check_in_time} 체크인</div>
+                  </div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
+                  <div>📍 {log.check_in_address}</div>
+                  {log.check_in_lat && log.check_in_lng && (
+                    <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 4 }}>
+                      GPS {log.check_in_lat.toFixed(5)}, {log.check_in_lng.toFixed(5)}
+                    </div>
+                  )}
+                </div>
+                <button onClick={handleCheckIn} disabled={checkInLoading} style={{ marginTop: 10, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, padding: '6px 14px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>
+                  🔄 재체크인
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 24 }}>📍</span>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>출근 체크인</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>GPS로 현재 위치를 기록하세요</div>
+                  </div>
+                </div>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6, marginBottom: 12 }}>
+                  사무실이든 거래처든 어디서나 체크인 가능.<br />위치 + 시간이 자동 기록됩니다.
+                </p>
+                <button onClick={handleCheckIn} disabled={checkInLoading || !log?.is_working} style={{
+                  width: '100%', background: checkInLoading ? 'rgba(255,255,255,0.2)' : '#fff',
+                  border: 'none', borderRadius: 10, padding: '12px',
+                  color: '#1e40af', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}>
+                  {checkInLoading ? '📡 GPS 위치 확인 중...' : '📍 지금 출근 체크인'}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Date & Status */}
           <div style={card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
