@@ -195,6 +195,7 @@ export default function Dashboard() {
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const logRef = useRef<SalesLog | null>(null)
+  const selectedDateRef = useRef(toDateStr(new Date()))
   const [form, setForm] = useState({
     activity_time: '', end_time: '', activity_type: '미팅',
     company: '', contact: '', address: '', content: '', result: '', next_action: '',
@@ -214,47 +215,33 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // 자정 자동 날짜 전환 + 전날 일지 마무리 (화면 복귀 시에도 체크)
+  // 날짜 자동 전환: 1분마다 + 화면 복귀 시 체크
   useEffect(() => {
     if (!profile) return
 
-    async function checkAndRollover() {
+    async function checkDate() {
       const today = toDateStr(new Date())
-      const currentDate = toDateStr(new Date()) // 항상 최신 날짜
-      // selectedDate가 오늘과 다르면 전환
-      setSelectedDate(prev => {
-        if (prev !== today) {
-          // 전날 일지 마무리
-          const prevLog = logRef.current
-          if (prevLog?.is_working) {
-            updateLogWorking(prevLog.id, false)
-            setLog(l => l ? { ...l, is_working: false } : l)
-          }
-          load(profile.id, today)
-          return today
-        }
-        return prev
-      })
+      if (selectedDateRef.current === today) return
+      // 날짜가 바뀐 경우: 전날 일지 마무리 후 오늘로 전환
+      const prevLog = logRef.current
+      if (prevLog?.is_working) {
+        await updateLogWorking(prevLog.id, false)
+        setLog(l => l ? { ...l, is_working: false } : l)
+      }
+      selectedDateRef.current = today
+      setSelectedDate(today)
+      // selectedDate 변경 → 아래 useEffect가 load() 호출
     }
 
-    // 앱이 포그라운드로 돌아올 때 날짜 체크 (모바일 슬립 대응)
-    const onVisible = () => { if (document.visibilityState === 'visible') checkAndRollover() }
+    const interval = setInterval(checkDate, 60_000)
+    const onVisible = () => { if (document.visibilityState === 'visible') checkDate() }
     document.addEventListener('visibilitychange', onVisible)
 
-    // 자정 타이머 (앱이 계속 열려있을 때)
-    function msUntilMidnight() {
-      const now = new Date()
-      const midnight = new Date(now)
-      midnight.setHours(24, 0, 0, 0)
-      return midnight.getTime() - now.getTime()
-    }
-    const midnightTimeout = setTimeout(() => checkAndRollover(), msUntilMidnight())
-
     return () => {
+      clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisible)
-      clearTimeout(midnightTimeout)
     }
-  }, [profile?.id, load])
+  }, [profile?.id])
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -550,7 +537,7 @@ export default function Dashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span>📅</span>
-                <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
+                <input type="date" value={selectedDate} onChange={e => { selectedDateRef.current = e.target.value; setSelectedDate(e.target.value) }}
                   style={{ fontWeight: 600, fontSize: 14, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '4px 8px' }} />
               </div>
               {log && (
