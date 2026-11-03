@@ -428,8 +428,10 @@ export default function Dashboard() {
             {profile.name || profile.email}
             {profile.role === 'admin' && <span style={{ marginLeft: 6, background: '#f59e0b', color: '#000', borderRadius: 4, padding: '1px 6px', fontSize: 11 }}>관리자</span>}
           </span>
-          {profile.role === 'admin' && (
-            <button onClick={() => router.push('/admin')} style={{ background: '#f59e0b', border: 'none', borderRadius: 8, padding: '6px 14px', color: '#000', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>👑 관리자</button>
+          {(profile.role === 'admin' || profile.role === 'owner') && (
+            <button onClick={() => router.push('/admin')} style={{ background: profile.role === 'owner' ? '#f59e0b' : 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: '6px 14px', color: profile.role === 'owner' ? '#000' : '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+              {profile.role === 'owner' ? '⭐ 관리자' : '👑 관리자'}
+            </button>
           )}
           <button onClick={async () => { await supabase.auth.signOut(); router.push('/login') }} style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, padding: '6px 14px', color: '#fff', cursor: 'pointer', fontSize: 13 }}>로그아웃</button>
         </div>

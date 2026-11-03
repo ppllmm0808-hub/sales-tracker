@@ -12,8 +12,8 @@ async function verifyAdmin(req: NextRequest) {
   if (!token) return null
   const { data: { user } } = await supabaseAdmin.auth.getUser(token)
   if (!user) return null
-  const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
-  return profile?.role === 'admin' ? user : null
+  const { data: profile } = await supabaseAdmin.from('profiles').select('role, email').eq('id', user.id).single()
+  return (profile?.role === 'admin' || profile?.role === 'owner') ? { ...user, role: profile.role, profileEmail: profile.email } : null
 }
 
 export async function GET(req: NextRequest) {
@@ -56,13 +56,10 @@ export async function PATCH(req: NextRequest) {
   const { id, name, role } = await req.json()
   if (!id) return NextResponse.json({ error: 'id 필요' }, { status: 400 })
 
-  // 관리자 승격은 최고 관리자(OWNER_EMAIL)만 가능
-  if (role === 'admin') {
-    const { data: requestor } = await supabaseAdmin.from('profiles').select('email').eq('id', admin.id).single()
-    if (requestor?.email !== process.env.OWNER_EMAIL) {
-      return NextResponse.json({
-        error: '관리자 권한 부여는 최고 관리자만 가능합니다.\n최고 관리자에게 승인을 요청하세요.'
-      }, { status: 403 })
+  // admin/owner 승격은 owner만 가능
+  if (role === 'admin' || role === 'owner') {
+    if ((admin as any).role !== 'owner') {
+      return NextResponse.json({ error: '관리자 지정은 프로그램 관리자만 가능합니다.' }, { status: 403 })
     }
   }
 

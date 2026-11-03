@@ -9,7 +9,7 @@ export interface Profile {
   id: string
   email: string
   name: string | null
-  role: 'member' | 'admin'
+  role: 'member' | 'admin' | 'owner'
   created_at: string
 }
 
