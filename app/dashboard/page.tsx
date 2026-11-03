@@ -726,12 +726,12 @@ export default function Dashboard() {
       {/* Modal */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', width: '100%', maxWidth: 520, overflow: 'hidden' }}>
+          <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', width: '100%', maxWidth: 520, overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ background: '#4f46e5', color: '#fff', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 700, fontSize: 16 }}>💼 {editTarget ? '영업 활동 수정' : '영업 활동 등록'}</span>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>✕</button>
             </div>
-            <form onSubmit={handleSave} style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <form onSubmit={handleSave} style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, overflowY: 'auto', flex: 1 }}>
               <label style={lbl}>시작 시간 *<input type="time" required value={form.activity_time} onChange={e => setForm(p => ({ ...p, activity_time: e.target.value }))} style={inp} /></label>
               <label style={lbl}>종료 시간<input type="time" value={form.end_time} onChange={e => setForm(p => ({ ...p, end_time: e.target.value }))} style={inp} /></label>
               <label style={lbl}>활동 구분 *
@@ -744,11 +744,13 @@ export default function Dashboard() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>방문 위치 (주소/도시명)</span>
                   <button type="button" onClick={captureGPS} disabled={gpsLoading} style={{
-                    background: 'none', border: 'none', padding: '2px 0',
+                    background: formCoords ? '#dcfce7' : '#ede9fe',
+                    border: `1px solid ${formCoords ? '#86efac' : '#a5b4fc'}`,
+                    borderRadius: 8, padding: '4px 10px',
                     color: formCoords ? '#15803d' : '#4338ca', cursor: 'pointer',
-                    fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
+                    fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
                   }}>
-                    {gpsLoading ? '📡 위치 확인 중...' : formCoords ? `✅ GPS (${formCoords.lat.toFixed(4)}, ${formCoords.lng.toFixed(4)})` : '📍 GPS 현재 위치'}
+                    {gpsLoading ? '📡 확인 중...' : formCoords ? '✅ GPS 완료' : '📍 GPS'}
                   </button>
                 </div>
                 <input type="text" value={form.address} onChange={e => { setForm(p => ({ ...p, address: e.target.value })); setFormCoords(null) }} style={inp} placeholder="주소 직접 입력 또는 GPS 버튼으로 자동 입력" />
