@@ -20,6 +20,7 @@ const TYPE_STYLE: Record<string, { bg: string; text: string; icon: string }> = {
 }
 
 function toDateStr(d: Date) { return d.toISOString().split('T')[0] }
+const iStyle: React.CSSProperties = { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#1e293b' }
 
 type MemberData = {
   log: SalesLog & { profiles?: Profile }
@@ -130,7 +131,13 @@ export default function AdminPage() {
   const [members, setMembers] = useState<MemberData[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'map' | 'users'>('list')
+  const [users, setUsers] = useState<Profile[]>([])
+  const [userForm, setUserForm] = useState({ email: '', password: '', name: '', role: 'member' })
+  const [editUser, setEditUser] = useState<Profile | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', role: 'member', password: '' })
+  const [userLoading, setUserLoading] = useState(false)
+  const [userMsg, setUserMsg] = useState('')
 
   const loadData = useCallback(async (date: string) => {
     setLoading(true)
@@ -146,15 +153,75 @@ export default function AdminPage() {
     setLoading(false)
   }, [])
 
+  const loadUsers = useCallback(async (token: string) => {
+    const res = await fetch('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } })
+    if (res.ok) setUsers(await res.json())
+  }, [])
+
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) { router.push('/login'); return }
       const p = await getProfile(data.session.user.id)
       if (!p || p.role !== 'admin') { router.push('/dashboard'); return }
       setProfile(p)
-      await loadData(selectedDate)
+      await Promise.all([loadData(selectedDate), loadUsers(data.session.access_token)])
     })
-  }, [router, loadData, selectedDate])
+  }, [router, loadData, loadUsers, selectedDate])
+
+  async function getToken() {
+    const { data } = await supabase.auth.getSession()
+    return data.session?.access_token || ''
+  }
+
+  async function handleCreateUser(e: React.FormEvent) {
+    e.preventDefault()
+    setUserLoading(true); setUserMsg('')
+    const token = await getToken()
+    const res = await fetch('/api/admin/users', {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(userForm),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      setUserMsg('✅ 계정이 생성됐습니다.')
+      setUserForm({ email: '', password: '', name: '', role: 'member' })
+      await loadUsers(token)
+    } else {
+      setUserMsg(`❌ ${data.error}`)
+    }
+    setUserLoading(false)
+  }
+
+  async function handleUpdateUser(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editUser) return
+    setUserLoading(true); setUserMsg('')
+    const token = await getToken()
+    const res = await fetch('/api/admin/users', {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editUser.id, ...editForm }),
+    })
+    if (res.ok) {
+      setUserMsg('✅ 수정됐습니다.')
+      setEditUser(null)
+      await loadUsers(token)
+    } else {
+      const d = await res.json()
+      setUserMsg(`❌ ${d.error}`)
+    }
+    setUserLoading(false)
+  }
+
+  async function handleDeleteUser(id: string, name: string) {
+    if (!confirm(`${name} 계정을 삭제하시겠습니까?\n모든 데이터가 함께 삭제됩니다.`)) return
+    const token = await getToken()
+    await fetch('/api/admin/users', {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    setUserMsg('✅ 삭제됐습니다.')
+    await loadUsers(token)
+  }
 
   const checkedIn = members.filter(m => m.log.check_in_time).length
   const totalActs = members.reduce((s, m) => s + m.activities.length, 0)
@@ -204,13 +271,104 @@ export default function AdminPage() {
 
         {/* 탭 */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button onClick={() => setViewMode('list')} style={{ padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === 'list' ? '#0f172a' : '#f1f5f9', color: viewMode === 'list' ? '#fff' : '#64748b' }}>👥 팀원 현황</button>
-          <button onClick={() => setViewMode('map')} style={{ padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === 'map' ? '#0f172a' : '#f1f5f9', color: viewMode === 'map' ? '#fff' : '#64748b' }}>🗺️ 전체 이동 경로</button>
+          {([['list','👥 팀원 현황'],['map','🗺️ 이동 경로'],['users','⚙️ 계정 관리']] as const).map(([m, label]) => (
+            <button key={m} onClick={() => { setViewMode(m); setUserMsg('') }} style={{ padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === m ? '#0f172a' : '#f1f5f9', color: viewMode === m ? '#fff' : '#64748b' }}>{label}</button>
+          ))}
         </div>
 
-        {loading ? (
+        {/* 계정 관리 탭 */}
+        {viewMode === 'users' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 20 }}>
+            {/* 계정 생성 */}
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 24 }}>
+              <h3 style={{ fontWeight: 700, fontSize: 16, color: '#0f172a', marginBottom: 16 }}>➕ 새 계정 등록</h3>
+              <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[
+                  { label: '이름', key: 'name', type: 'text', placeholder: '홍길동' },
+                  { label: '이메일 *', key: 'email', type: 'email', placeholder: 'user@company.com' },
+                  { label: '비밀번호 *', key: 'password', type: 'password', placeholder: '8자 이상' },
+                ].map(f => (
+                  <label key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                    {f.label}
+                    <input type={f.type} placeholder={f.placeholder} value={(userForm as any)[f.key]}
+                      onChange={e => setUserForm(p => ({ ...p, [f.key]: e.target.value }))}
+                      style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 14, color: '#1e293b' }} />
+                  </label>
+                ))}
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                  권한
+                  <select value={userForm.role} onChange={e => setUserForm(p => ({ ...p, role: e.target.value }))}
+                    style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '9px 12px', fontSize: 14, color: '#1e293b' }}>
+                    <option value="member">담당자 (일반)</option>
+                    <option value="admin">관리자</option>
+                  </select>
+                </label>
+                {userMsg && <p style={{ fontSize: 13, color: userMsg.startsWith('✅') ? '#059669' : '#dc2626' }}>{userMsg}</p>}
+                <button type="submit" disabled={userLoading} style={{ background: '#0f172a', border: 'none', borderRadius: 10, padding: '11px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', marginTop: 4 }}>
+                  {userLoading ? '처리 중...' : '계정 생성'}
+                </button>
+              </form>
+              <div style={{ marginTop: 20, padding: 14, background: '#f8fafc', borderRadius: 10, fontSize: 12, color: '#64748b', lineHeight: 1.7 }}>
+                <b style={{ color: '#334155' }}>로그인 방법</b><br />
+                생성된 계정으로 <b>sales-tracker-5a2h.vercel.app</b> 에서<br />
+                이메일 + 비밀번호로 바로 로그인 가능합니다.<br />
+                별도 회원가입 불필요.
+              </div>
+            </div>
+
+            {/* 계정 목록 */}
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 24 }}>
+              <h3 style={{ fontWeight: 700, fontSize: 16, color: '#0f172a', marginBottom: 16 }}>👤 등록된 계정 ({users.length}명)</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {users.map(u => (
+                  <div key={u.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px' }}>
+                    {editUser?.id === u.id ? (
+                      <form onSubmit={handleUpdateUser} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          <input placeholder="이름" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} style={iStyle} />
+                          <input type="password" placeholder="새 비밀번호 (변경시만)" value={editForm.password} onChange={e => setEditForm(p => ({ ...p, password: e.target.value }))} style={iStyle} />
+                        </div>
+                        <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))} style={iStyle}>
+                          <option value="member">담당자</option>
+                          <option value="admin">관리자</option>
+                        </select>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button type="submit" disabled={userLoading} style={{ flex: 1, background: '#4f46e5', border: 'none', borderRadius: 8, padding: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>저장</button>
+                          <button type="button" onClick={() => setEditUser(null)} style={{ flex: 1, background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '8px', color: '#64748b', cursor: 'pointer', fontSize: 13 }}>취소</button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: u.role === 'admin' ? '#f59e0b' : '#4f46e5', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0 }}>
+                          {(u.name || u.email).charAt(0)}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{u.name || '(이름 없음)'}</span>
+                            <span style={{ background: u.role === 'admin' ? '#fef3c7' : '#eef2ff', color: u.role === 'admin' ? '#b45309' : '#4338ca', borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 600 }}>
+                              {u.role === 'admin' ? '👑 관리자' : '담당자'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 12, color: '#64748b', marginTop: 1 }}>{u.email}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => { setEditUser(u); setEditForm({ name: u.name || '', role: u.role, password: '' }); setUserMsg('') }}
+                            style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: '#475569' }}>수정</button>
+                          <button onClick={() => handleDeleteUser(u.id, u.name || u.email)}
+                            style={{ background: '#fee2e2', border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: '#dc2626' }}>삭제</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {loading && viewMode !== 'users' ? (
           <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>불러오는 중...</div>
-        ) : members.length === 0 ? (
+        ) : viewMode !== 'users' && members.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 60, background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', color: '#94a3b8' }}>
             <p style={{ fontSize: 36 }}>📋</p>
             <p style={{ marginTop: 8 }}>이 날짜에 등록된 활동이 없습니다</p>
