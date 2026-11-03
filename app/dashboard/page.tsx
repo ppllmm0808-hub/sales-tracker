@@ -33,7 +33,7 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
   return null
 }
 
-function MapPanel({ activities }: { activities: Activity[] }) {
+function MapPanel({ activities, checkIn }: { activities: Activity[]; checkIn?: { time: string; lat: number; lng: number; address: string } }) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const withCoords = activities.filter(a => a.lat && a.lng)
@@ -51,62 +51,68 @@ function MapPanel({ activities }: { activities: Activity[] }) {
       const L = (window as any).L
       if (!mapRef.current) return
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null }
-      const map = L.map(mapRef.current).setView([37.5665, 126.9780], 12)
+      const map = L.map(mapRef.current).setView([37.5665, 126.9780], 13)
       mapInstanceRef.current = map
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd', maxZoom: 19,
       }).addTo(map)
-      const pts = activities.filter(a => a.lat && a.lng)
-      if (pts.length > 0) {
-        const bounds = L.latLngBounds(pts.map(a => [a.lat!, a.lng!]))
-        map.fitBounds(bounds, { padding: [60, 60] })
-        // 이동 경로 라인 (굵고 명확하게)
-        if (pts.length > 1) {
-          L.polyline(pts.map(a => [a.lat!, a.lng!]), {
-            color: '#4f46e5', weight: 4, opacity: 0.8,
-          }).addTo(map)
-          // 방향 화살표 (중간 지점마다)
-          for (let i = 0; i < pts.length - 1; i++) {
-            const p1 = pts[i], p2 = pts[i + 1]
-            const midLat = (p1.lat! + p2.lat!) / 2
-            const midLng = (p1.lng! + p2.lng!) / 2
-            const angle = Math.atan2(p2.lng! - p1.lng!, p2.lat! - p1.lat!) * 180 / Math.PI
-            const arrowIcon = L.divIcon({
-              className: '',
-              html: `<div style="transform:rotate(${angle}deg);color:#4f46e5;font-size:18px;line-height:1;text-shadow:0 0 3px #fff">➤</div>`,
-              iconSize: [20, 20], iconAnchor: [10, 10],
-            })
-            L.marker([midLat, midLng], { icon: arrowIcon }).addTo(map)
-          }
-        }
-        // 활동 핀
-        pts.forEach((act, i) => {
-          const s = TYPE_STYLE[act.activity_type] || TYPE_STYLE['기타']
-          const isFirst = i === 0, isLast = i === pts.length - 1
-          const icon = L.divIcon({
-            className: '',
-            html: `<div style="position:relative">
-              <div style="background:${isFirst ? '#059669' : isLast ? '#dc2626' : s.text};color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.4);cursor:pointer">${i + 1}</div>
-              ${isFirst ? '<div style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);background:#059669;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;white-space:nowrap">출발</div>' : ''}
-              ${isLast ? '<div style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;white-space:nowrap">도착</div>' : ''}
-            </div>`,
-            iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -20],
-          })
-          L.marker([act.lat!, act.lng!], { icon }).addTo(map).bindPopup(`
-            <div style="min-width:200px;font-family:system-ui;font-size:13px;line-height:1.5">
-              <div style="font-weight:700;margin-bottom:6px;color:#1e293b;font-size:14px">${i + 1}. ${act.activity_time}${act.end_time ? ' ~ ' + act.end_time : ''}</div>
-              <div style="display:inline-block;background:${s.bg};color:${s.text};border-radius:12px;padding:2px 8px;font-size:11px;font-weight:600;margin-bottom:6px">${s.icon} ${act.activity_type}</div>
-              ${act.company ? `<div style="font-weight:600;color:#0f172a;font-size:14px">${act.company}</div>` : ''}
-              ${act.address ? `<div style="color:#64748b;font-size:12px;margin-top:2px">📍 ${act.address}</div>` : ''}
-              ${act.contact ? `<div style="color:#64748b;font-size:12px">👤 ${act.contact}</div>` : ''}
-              ${act.content ? `<div style="margin-top:6px;color:#334155;font-size:12px;border-top:1px solid #f1f5f9;padding-top:6px">${act.content}</div>` : ''}
-              ${act.result ? `<div style="color:#059669;margin-top:4px;font-size:12px">✅ ${act.result}</div>` : ''}
-              ${act.next_action ? `<div style="color:#4338ca;margin-top:4px;font-size:12px">➡️ ${act.next_action}</div>` : ''}
-            </div>
-          `, { maxWidth: 260 })
-        })
+
+      // 출근 위치 + 활동 위치 통합
+      const actPts = activities.filter(a => a.lat && a.lng)
+      const allPts: Array<{ lat: number; lng: number; label: string; time: string; type: 'checkin' | 'activity'; act?: Activity; idx: number }> = []
+
+      if (checkIn?.lat && checkIn?.lng) {
+        allPts.push({ lat: checkIn.lat, lng: checkIn.lng, label: '출근', time: checkIn.time, type: 'checkin', idx: 0 })
       }
+      actPts.forEach((a, i) => allPts.push({ lat: a.lat!, lng: a.lng!, label: String(allPts.length + 1), time: a.activity_time, type: 'activity', act: a, idx: allPts.length }))
+
+      if (allPts.length === 0) return
+      const bounds = L.latLngBounds(allPts.map(p => [p.lat, p.lng]))
+      map.fitBounds(bounds, { padding: [60, 60] })
+
+      // 이동 경로 라인
+      if (allPts.length > 1) {
+        L.polyline(allPts.map(p => [p.lat, p.lng]), { color: '#4f46e5', weight: 4, opacity: 0.75 }).addTo(map)
+        for (let i = 0; i < allPts.length - 1; i++) {
+          const p1 = allPts[i], p2 = allPts[i + 1]
+          const midLat = (p1.lat + p2.lat) / 2, midLng = (p1.lng + p2.lng) / 2
+          const angle = Math.atan2(p2.lng - p1.lng, p2.lat - p1.lat) * 180 / Math.PI
+          L.marker([midLat, midLng], { icon: L.divIcon({ className: '', html: `<div style="transform:rotate(${angle}deg);color:#4f46e5;font-size:18px;line-height:1;filter:drop-shadow(0 0 2px #fff)">➤</div>`, iconSize: [20, 20], iconAnchor: [10, 10] }) }).addTo(map)
+        }
+      }
+
+      // 핀 표시
+      allPts.forEach((p, i) => {
+        const isCheckIn = p.type === 'checkin'
+        const isLast = i === allPts.length - 1
+        const s = p.act ? (TYPE_STYLE[p.act.activity_type] || TYPE_STYLE['기타']) : null
+        const bgColor = isCheckIn ? '#059669' : isLast ? '#dc2626' : (s?.text || '#4f46e5')
+        const topLabel = isCheckIn ? '🏢 출근' : isLast && allPts.length > 1 ? '현재' : null
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="position:relative;text-align:center">
+            ${topLabel ? `<div style="position:absolute;top:-20px;left:50%;transform:translateX(-50%);background:${bgColor};color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">${topLabel}</div>` : ''}
+            <div style="background:${bgColor};color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${isCheckIn ? '16px' : '13px'};font-weight:700;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.4)">${isCheckIn ? '🏢' : p.label}</div>
+          </div>`,
+          iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -22],
+        })
+        const popup = isCheckIn
+          ? `<div style="font-family:system-ui;font-size:13px;min-width:180px">
+              <div style="font-weight:700;color:#059669;font-size:14px;margin-bottom:4px">🏢 출근 체크인</div>
+              <div style="color:#334155">⏰ ${p.time}</div>
+              <div style="color:#64748b;font-size:12px;margin-top:2px">📍 ${checkIn?.address}</div>
+            </div>`
+          : `<div style="font-family:system-ui;font-size:13px;min-width:200px;line-height:1.5">
+              <div style="font-weight:700;color:#1e293b;font-size:14px;margin-bottom:4px">${p.label}. ${p.act?.activity_time}${p.act?.end_time ? ' ~ ' + p.act?.end_time : ''}</div>
+              ${s ? `<span style="background:${s.bg};color:${s.text};border-radius:12px;padding:2px 8px;font-size:11px;font-weight:600">${s.icon} ${p.act?.activity_type}</span>` : ''}
+              ${p.act?.company ? `<div style="font-weight:600;margin-top:4px">${p.act.company}</div>` : ''}
+              ${p.act?.address ? `<div style="color:#64748b;font-size:12px">📍 ${p.act.address}</div>` : ''}
+              ${p.act?.content ? `<div style="margin-top:6px;font-size:12px;border-top:1px solid #f1f5f9;padding-top:6px">${p.act.content}</div>` : ''}
+              ${p.act?.result ? `<div style="color:#059669;font-size:12px;margin-top:4px">✅ ${p.act.result}</div>` : ''}
+            </div>`
+        L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(popup, { maxWidth: 260 })
+      })
     }
     if ((window as any).L) { initMap(); return }
     if (!document.getElementById('leaflet-js')) {
@@ -121,11 +127,12 @@ function MapPanel({ activities }: { activities: Activity[] }) {
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null } }
   }, [activities])
 
-  if (withCoords.length === 0) return (
+  const hasAnyLocation = withCoords.length > 0 || (checkIn?.lat && checkIn?.lng)
+  if (!hasAnyLocation) return (
     <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
       <p style={{ fontSize: 40 }}>🗺️</p>
       <p style={{ marginTop: 8, fontWeight: 600, color: '#64748b' }}>지도에 표시할 위치가 없습니다</p>
-      <p style={{ fontSize: 13, marginTop: 4 }}>활동 등록 시 주소를 입력하면 자동으로 지도에 표시됩니다</p>
+      <p style={{ fontSize: 13, marginTop: 4 }}>출근 체크인 또는 활동 등록 시 주소를 입력하면 경로가 표시됩니다</p>
     </div>
   )
 
@@ -133,13 +140,21 @@ function MapPanel({ activities }: { activities: Activity[] }) {
     <div>
       <div ref={mapRef} style={{ height: 420, borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0' }} />
       <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {checkIn?.lat && checkIn?.lng && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}>
+            <span style={{ background: '#059669', color: '#fff', width: 20, height: 20, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flexShrink: 0 }}>🏢</span>
+            <span style={{ color: '#059669', fontWeight: 700 }}>{checkIn.time} 출근</span>
+            <span style={{ color: '#64748b' }}>{checkIn.address}</span>
+          </div>
+        )}
         {withCoords.map((act, i) => {
           const s = TYPE_STYLE[act.activity_type] || TYPE_STYLE['기타']
+          const num = (checkIn?.lat ? 1 : 0) + i + 1
           return (
             <div key={act.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}>
-              <span style={{ background: s.text, color: '#fff', width: 18, height: 18, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+              <span style={{ background: s.text, color: '#fff', width: 18, height: 18, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{num}</span>
               <span style={{ color: '#334155', fontWeight: 600 }}>{act.activity_time}</span>
-              <span style={{ color: s.text, fontWeight: 600 }}>{act.activity_type}</span>
+              <span style={{ color: s.text, fontWeight: 600 }}>{s.icon} {act.activity_type}</span>
               <span style={{ color: '#64748b' }}>{act.company || act.address}</span>
             </div>
           )
@@ -201,7 +216,9 @@ export default function Dashboard() {
   function openAdd() {
     setEditTarget(null)
     setFormCoords(null)
-    setForm({ activity_time: '', end_time: '', activity_type: '미팅', company: '', contact: '', address: '', content: '', result: '', next_action: '' })
+    const now = new Date()
+    const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    setForm({ activity_time: time, end_time: '', activity_type: '미팅', company: '', contact: '', address: '', content: '', result: '', next_action: '' })
     setShowModal(true)
   }
 
@@ -556,7 +573,7 @@ export default function Dashboard() {
           {/* Map View */}
           {viewMode === 'map' && log?.is_working && (
             <div style={card}>
-              <MapPanel activities={sorted} />
+              <MapPanel activities={sorted} checkIn={log?.check_in_lat && log?.check_in_lng ? { time: log.check_in_time!, lat: log.check_in_lat, lng: log.check_in_lng, address: log.check_in_address! } : undefined} />
             </div>
           )}
 
