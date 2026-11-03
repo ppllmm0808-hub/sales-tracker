@@ -714,31 +714,38 @@ export default function AdminPage() {
           </div>
         ) : viewMode === 'export' || viewMode === 'report' ? null : viewMode === 'map' ? (
           <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 20 }}>
-            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap' }}>표시 담당자:</span>
-              <button onClick={() => setSelectedMemberIds(new Set())}
-                style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: selectedMemberIds.size === 0 ? '#0f172a' : '#f1f5f9', color: selectedMemberIds.size === 0 ? '#fff' : '#64748b' }}>
-                전체
-              </button>
-              {members.map(m => {
-                const id = m.log.user_id
-                const isOn = selectedMemberIds.size === 0 || selectedMemberIds.has(id)
-                const name = (m.log as any).profiles?.name || (m.log as any).profiles?.email || '미확인'
+            <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap' }}>담당자 선택</span>
+              <select
+                value={selectedMemberIds.size === 0 ? '__all__' : [...selectedMemberIds][0]}
+                onChange={e => {
+                  const v = e.target.value
+                  setSelectedMemberIds(v === '__all__' ? new Set() : new Set([v]))
+                }}
+                style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 14px', fontSize: 14, color: '#1e293b', minWidth: 180, cursor: 'pointer' }}>
+                <option value="__all__">전체 보기</option>
+                {members.map(m => {
+                  const id = m.log.user_id
+                  const name = (m.log as any).profiles?.name || (m.log as any).profiles?.email || '미확인'
+                  return (
+                    <option key={id} value={id}>
+                      {name} ({m.activities.length}건{m.log.check_in_time ? ` · 출근 ${m.log.check_in_time}` : ' · 미출근'})
+                    </option>
+                  )
+                })}
+              </select>
+              {selectedMemberIds.size > 0 && (() => {
+                const m = members.find(x => selectedMemberIds.has(x.log.user_id))
+                if (!m) return null
                 return (
-                  <button key={id} onClick={() => {
-                    setSelectedMemberIds(prev => {
-                      const next = new Set(prev.size === 0 ? members.map(x => x.log.user_id) : prev)
-                      if (next.has(id)) { next.delete(id) } else { next.add(id) }
-                      if (next.size === members.length) return new Set()
-                      return next
-                    })
-                  }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `2px solid ${m.color}`, background: isOn ? m.color : '#fff', color: isOn ? '#fff' : m.color, transition: 'all 0.15s' }}>
-                    <span>{name}</span>
-                    <span style={{ opacity: 0.75 }}>{m.activities.length}건</span>
-                    {m.log.check_in_time && <span>✓</span>}
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '6px 14px', fontSize: 12 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: m.color }} />
+                    <span style={{ fontWeight: 600, color: '#0369a1' }}>{(m.log as any).profiles?.name || '미확인'}</span>
+                    <span style={{ color: '#64748b' }}>활동 {m.activities.length}건</span>
+                    {m.log.check_in_time && <span style={{ color: '#059669' }}>✓ {m.log.check_in_time} 출근</span>}
+                  </div>
                 )
-              })}
+              })()}
             </div>
             <AdminMap members={selectedMemberIds.size === 0 ? members : members.filter(m => selectedMemberIds.has(m.log.user_id))} />
           </div>
