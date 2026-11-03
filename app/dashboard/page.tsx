@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase, getOrCreateLog, getActivities, saveActivity, deleteActivity, updateLogSummary, getProfile } from '@/lib/supabase'
+import { supabase, getOrCreateLog, getActivities, saveActivity, deleteActivity, updateLogSummary, updateLogWorking, getProfile } from '@/lib/supabase'
 import type { Activity, SalesLog, Profile } from '@/lib/supabase'
 
 const ACTIVITY_TYPES = ['방문', '전화', '미팅', '이메일', '제안', '계약', '기타']
@@ -76,6 +76,13 @@ export default function Dashboard() {
     }
   }
 
+  async function handleToggleWorking() {
+    if (!log) return
+    const next = !log.is_working
+    await updateLogWorking(log.id, next)
+    setLog(prev => prev ? { ...prev, is_working: next } : prev)
+  }
+
   async function handleSummary() {
     if (!log) return
     const text = activities.map(a =>
@@ -125,12 +132,33 @@ export default function Dashboard() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600 }}>타임라인</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600 }}>타임라인</h2>
+            {log && (
+              <button onClick={handleToggleWorking} style={{
+                background: log.is_working ? 'rgba(129,199,132,0.15)' : 'rgba(239,68,68,0.15)',
+                border: `1px solid ${log.is_working ? 'rgba(129,199,132,0.4)' : 'rgba(239,68,68,0.4)'}`,
+                borderRadius: 20, padding: '4px 14px', color: log.is_working ? '#81c784' : '#ef4444',
+                cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              }}>
+                {log.is_working ? '✓ 근무중' : '✕ 휴무'}
+              </button>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handleSummary} style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '8px 16px', color: '#f59e0b', cursor: 'pointer', fontSize: 13 }}>요약 저장</button>
-            <button onClick={() => setShowForm(!showForm)} style={{ background: 'linear-gradient(135deg, #4fc3f7, #0288d1)', border: 'none', borderRadius: 8, padding: '8px 16px', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>+ 활동 추가</button>
+            <button onClick={handleSummary} disabled={!log?.is_working} style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '8px 16px', color: '#f59e0b', cursor: log?.is_working ? 'pointer' : 'not-allowed', fontSize: 13, opacity: log?.is_working ? 1 : 0.4 }}>요약 저장</button>
+            <button onClick={() => setShowForm(!showForm)} disabled={!log?.is_working} style={{ background: log?.is_working ? 'linear-gradient(135deg, #4fc3f7, #0288d1)' : 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, padding: '8px 16px', color: '#fff', cursor: log?.is_working ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 600, opacity: log?.is_working ? 1 : 0.4 }}>+ 활동 추가</button>
           </div>
         </div>
+
+        {log && !log.is_working && (
+          <div style={{ textAlign: 'center', padding: '40px 0', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, marginBottom: 20 }}>
+            <p style={{ fontSize: 32 }}>🏖️</p>
+            <p style={{ color: '#ef4444', fontWeight: 600, marginTop: 8 }}>휴무일</p>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4 }}>연차/공휴일로 설정되었습니다</p>
+            <button onClick={handleToggleWorking} style={{ marginTop: 16, background: 'rgba(129,199,132,0.15)', border: '1px solid rgba(129,199,132,0.4)', borderRadius: 8, padding: '8px 20px', color: '#81c784', cursor: 'pointer', fontSize: 13 }}>근무로 변경</button>
+          </div>
+        )}
 
         {showForm && (
           <form onSubmit={handleSave} style={{ background: 'rgba(79,195,247,0.05)', border: '1px solid rgba(79,195,247,0.2)', borderRadius: 12, padding: 20, marginBottom: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

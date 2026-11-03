@@ -19,6 +19,7 @@ export interface SalesLog {
   log_date: string
   summary: string | null
   weather: string | null
+  is_working: boolean
   created_at: string
   updated_at: string
   profiles?: Profile
@@ -75,6 +76,11 @@ export async function deleteActivity(id: string): Promise<void> {
 export async function updateLogSummary(logId: string, summary: string): Promise<void> {
   await supabase.from('sales_logs')
     .update({ summary, updated_at: new Date().toISOString() }).eq('id', logId)
+}
+
+export async function updateLogWorking(logId: string, is_working: boolean): Promise<void> {
+  await supabase.from('sales_logs')
+    .update({ is_working, updated_at: new Date().toISOString() }).eq('id', logId)
 }
 
 export async function getAllLogsForDate(date: string): Promise<SalesLog[]> {
