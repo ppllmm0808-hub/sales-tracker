@@ -100,3 +100,10 @@ export async function getAllLogsForDate(date: string): Promise<SalesLog[]> {
     .from('sales_logs').select('*, profiles(name, email, role)').eq('log_date', date)
   return data ?? []
 }
+
+export async function getActivitiesByLogIds(logIds: string[]): Promise<Activity[]> {
+  if (!logIds.length) return []
+  const { data } = await supabase
+    .from('activities').select('*').in('log_id', logIds).order('activity_time')
+  return data ?? []
+}
