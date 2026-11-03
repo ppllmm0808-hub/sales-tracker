@@ -135,7 +135,7 @@ export default function Dashboard() {
         {showForm && (
           <form onSubmit={handleSave} style={{ background: 'rgba(79,195,247,0.05)', border: '1px solid rgba(79,195,247,0.2)', borderRadius: 12, padding: 20, marginBottom: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <label style={lblStyle}>시간 *<input type="time" required value={form.activity_time} onChange={e => setForm(p => ({ ...p, activity_time: e.target.value }))} style={inpStyle} /></label>
-            <label style={lblStyle}>유형 *<select value={form.activity_type} onChange={e => setForm(p => ({ ...p, activity_type: e.target.value }))} style={inpStyle}>{ACTIVITY_TYPES.map(t => <option key={t}>{t}</option>)}</select></label>
+            <label style={lblStyle}>유형 *<select value={form.activity_type} onChange={e => setForm(p => ({ ...p, activity_type: e.target.value }))} style={inpStyle}>{ACTIVITY_TYPES.map(t => <option key={t} style={{ background: '#1a1a2e', color: '#fff' }}>{t}</option>)}</select></label>
             <label style={lblStyle}>거래처<input type="text" value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))} style={inpStyle} placeholder="회사명" /></label>
             <label style={lblStyle}>담당자<input type="text" value={form.contact} onChange={e => setForm(p => ({ ...p, contact: e.target.value }))} style={inpStyle} placeholder="담당자명" /></label>
             <label style={{ ...lblStyle, gridColumn: '1/-1' }}>활동 내용<textarea value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))} style={{ ...inpStyle, height: 80, resize: 'vertical' }} placeholder="활동 내용 입력..." /></label>
