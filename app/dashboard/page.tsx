@@ -138,7 +138,7 @@ function MapPanel({ activities, checkIn }: { activities: Activity[]; checkIn?: {
 
   return (
     <div>
-      <div ref={mapRef} style={{ height: 420, borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0' }} />
+      <div ref={mapRef} style={{ height: 'min(420px, 60vw)', minHeight: 260, borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0' }} />
       <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {checkIn?.lat && checkIn?.lng && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}>
@@ -180,6 +180,7 @@ function calcWorkHours(acts: Activity[]) {
 
 export default function Dashboard() {
   const router = useRouter()
+  const [isMobile, setIsMobile] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [log, setLog] = useState<SalesLog | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
@@ -202,6 +203,13 @@ export default function Dashboard() {
     const l = await getOrCreateLog(userId, date)
     setLog(l)
     if (l) setActivities(await getActivities(l.id))
+  }, [])
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
   }, [])
 
   useEffect(() => {
@@ -437,7 +445,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20 }}>
+      <main style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '16px 12px' : '24px 16px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '320px 1fr', gap: isMobile ? 12 : 20 }}>
         {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
