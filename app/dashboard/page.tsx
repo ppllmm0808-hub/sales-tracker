@@ -148,6 +148,8 @@ export default function Dashboard() {
   const [showModal, setShowModal] = useState(false)
   const [editTarget, setEditTarget] = useState<Activity | null>(null)
   const [viewMode, setViewMode] = useState<'timeline' | 'map'>('timeline')
+  const [gpsLoading, setGpsLoading] = useState(false)
+  const [formCoords, setFormCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [form, setForm] = useState({
     activity_time: '', end_time: '', activity_type: '미팅',
     company: '', contact: '', address: '', content: '', result: '', next_action: '',
@@ -173,12 +175,14 @@ export default function Dashboard() {
 
   function openAdd() {
     setEditTarget(null)
+    setFormCoords(null)
     setForm({ activity_time: '', end_time: '', activity_type: '미팅', company: '', contact: '', address: '', content: '', result: '', next_action: '' })
     setShowModal(true)
   }
 
   function openEdit(act: Activity) {
     setEditTarget(act)
+    setFormCoords(act.lat && act.lng ? { lat: act.lat, lng: act.lng } : null)
     setForm({
       activity_time: act.activity_time, end_time: act.end_time || '',
       activity_type: act.activity_type, company: act.company || '',
@@ -189,11 +193,36 @@ export default function Dashboard() {
     setShowModal(true)
   }
 
+  async function captureGPS() {
+    if (!navigator.geolocation) { alert('이 브라우저는 GPS를 지원하지 않습니다.'); return }
+    setGpsLoading(true)
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude: lat, longitude: lng } = pos.coords
+      setFormCoords({ lat, lng })
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ko`, {
+          headers: { 'User-Agent': 'SalesTracker/1.0' }
+        })
+        const data = await res.json()
+        if (data?.display_name) {
+          const addr = data.address
+          const short = [addr?.road, addr?.quarter || addr?.suburb, addr?.city_district || addr?.borough].filter(Boolean).join(' ')
+          setForm(p => ({ ...p, address: short || data.display_name.split(',').slice(0, 3).join(',').trim() }))
+        }
+      } catch {}
+      setGpsLoading(false)
+    }, (err) => {
+      setGpsLoading(false)
+      if (err.code === 1) alert('위치 권한을 허용해주세요.\n브라우저 주소창 왼쪽 자물쇠 아이콘을 클릭하세요.')
+      else alert('GPS 위치를 가져올 수 없습니다.')
+    }, { enableHighAccuracy: true, timeout: 10000 })
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!log || !profile) return
-    let coords: { lat: number; lng: number } | null = null
-    if (form.address) coords = await geocodeAddress(form.address)
+    let coords: { lat: number; lng: number } | null = formCoords
+    if (!coords && form.address) coords = await geocodeAddress(form.address)
     if (editTarget) {
       await updateActivity(editTarget.id, {
         activity_time: form.activity_time, end_time: form.end_time || null,
@@ -504,7 +533,19 @@ export default function Dashboard() {
                 </select>
               </label>
               <label style={lbl}>거래처/장소<input type="text" value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))} style={inp} placeholder="회사명 또는 장소" /></label>
-              <label style={{ ...lbl, gridColumn: '1/-1' }}>주소<input type="text" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} style={inp} placeholder="서울시 강남구 테헤란로..." /></label>
+              <label style={{ ...lbl, gridColumn: '1/-1' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>주소</span>
+                  <button type="button" onClick={captureGPS} disabled={gpsLoading} style={{
+                    background: formCoords ? '#dcfce7' : '#eef2ff', border: `1px solid ${formCoords ? '#86efac' : '#c7d2fe'}`,
+                    borderRadius: 6, padding: '2px 10px', fontSize: 12, fontWeight: 600,
+                    color: formCoords ? '#15803d' : '#4338ca', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                    {gpsLoading ? '📡 위치 가져오는 중...' : formCoords ? `✅ GPS 저장됨 (${formCoords.lat.toFixed(4)}, ${formCoords.lng.toFixed(4)})` : '📍 현재 GPS 위치 캡처'}
+                  </button>
+                </div>
+                <input type="text" value={form.address} onChange={e => { setForm(p => ({ ...p, address: e.target.value })); setFormCoords(null) }} style={inp} placeholder="서울시 강남구 테헤란로 123 또는 GPS 버튼 클릭" />
+              </label>
               <label style={lbl}>담당자<input type="text" value={form.contact} onChange={e => setForm(p => ({ ...p, contact: e.target.value }))} style={inp} placeholder="담당자명" /></label>
               <label style={lbl}>결과<input type="text" value={form.result} onChange={e => setForm(p => ({ ...p, result: e.target.value }))} style={inp} placeholder="계약/검토중 등" /></label>
               <label style={{ ...lbl, gridColumn: '1/-1' }}>활동 내용<textarea value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))} style={{ ...inp, height: 80, resize: 'vertical' }} placeholder="활동 내용 입력..." /></label>
