@@ -190,6 +190,9 @@ export default function Dashboard() {
   const [gpsLoading, setGpsLoading] = useState(false)
   const [formCoords, setFormCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [checkInLoading, setCheckInLoading] = useState(false)
+  const [timerStart, setTimerStart] = useState<string | null>(null)
+  const [elapsed, setElapsed] = useState(0)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
   const [form, setForm] = useState({
     activity_time: '', end_time: '', activity_type: '미팅',
     company: '', contact: '', address: '', content: '', result: '', next_action: '',
@@ -213,12 +216,33 @@ export default function Dashboard() {
     }).catch(() => router.push('/login'))
   }, [router, load, selectedDate])
 
+  function nowTime() {
+    const n = new Date()
+    return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`
+  }
+
+  function startTimer() {
+    const time = nowTime()
+    setTimerStart(time)
+    setElapsed(0)
+    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
+  }
+
+  function stopTimer() {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+    const endTime = nowTime()
+    setEditTarget(null)
+    setFormCoords(null)
+    setForm({ activity_time: timerStart || nowTime(), end_time: endTime, activity_type: '미팅', company: '', contact: '', address: '', content: '', result: '', next_action: '' })
+    setTimerStart(null)
+    setElapsed(0)
+    setShowModal(true)
+  }
+
   function openAdd() {
     setEditTarget(null)
     setFormCoords(null)
-    const now = new Date()
-    const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-    setForm({ activity_time: time, end_time: '', activity_type: '미팅', company: '', contact: '', address: '', content: '', result: '', next_action: '' })
+    setForm({ activity_time: nowTime(), end_time: '', activity_type: '미팅', company: '', contact: '', address: '', content: '', result: '', next_action: '' })
     setShowModal(true)
   }
 
@@ -492,16 +516,43 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Add Button */}
-          <button onClick={openAdd} disabled={!log?.is_working} style={{
-            background: log?.is_working ? '#4f46e5' : '#94a3b8',
-            color: '#fff', border: 'none', borderRadius: 12, padding: '14px',
-            fontSize: 15, fontWeight: 600, cursor: log?.is_working ? 'pointer' : 'not-allowed',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            boxShadow: log?.is_working ? '0 4px 12px rgba(79,70,229,0.3)' : 'none',
-          }}>
-            ➕ 새 영업 활동 추가
-          </button>
+          {/* Timer / Add Button */}
+          {timerStart ? (
+            <div style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', borderRadius: 16, padding: 20, color: '#fff', textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>🔴 활동 진행 중 — {timerStart} 시작</div>
+              <div style={{ fontSize: 36, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: 2, marginBottom: 16 }}>
+                {String(Math.floor(elapsed / 3600)).padStart(2,'0')}:{String(Math.floor((elapsed % 3600) / 60)).padStart(2,'0')}:{String(elapsed % 60).padStart(2,'0')}
+              </div>
+              <button onClick={stopTimer} style={{
+                width: '100%', background: '#fff', border: 'none', borderRadius: 10, padding: '12px',
+                color: '#dc2626', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}>
+                ⏹ 활동 종료 — 기록 저장
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={startTimer} disabled={!log?.is_working} style={{
+                background: log?.is_working ? '#4f46e5' : '#94a3b8',
+                color: '#fff', border: 'none', borderRadius: 12, padding: '14px',
+                fontSize: 15, fontWeight: 600, cursor: log?.is_working ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: log?.is_working ? '0 4px 12px rgba(79,70,229,0.3)' : 'none',
+              }}>
+                ▶ 활동 시작 (타이머)
+              </button>
+              <button onClick={openAdd} disabled={!log?.is_working} style={{
+                background: 'none', border: `1px solid ${log?.is_working ? '#c7d2fe' : '#e2e8f0'}`,
+                borderRadius: 10, padding: '9px', fontSize: 13,
+                color: log?.is_working ? '#4f46e5' : '#94a3b8',
+                cursor: log?.is_working ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}>
+                ✏️ 직접 시간 입력
+              </button>
+            </div>
+          )}
 
           {/* Summary Box */}
           <div style={{ background: 'linear-gradient(135deg, #312e81 0%, #0f172a 100%)', borderRadius: 16, padding: 20 }}>
