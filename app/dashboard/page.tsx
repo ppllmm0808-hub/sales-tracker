@@ -194,6 +194,7 @@ export default function Dashboard() {
   const [timerStart, setTimerStart] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const logRef = useRef<SalesLog | null>(null)
   const [form, setForm] = useState({
     activity_time: '', end_time: '', activity_type: '미팅',
     company: '', contact: '', address: '', content: '', result: '', next_action: '',
@@ -202,6 +203,7 @@ export default function Dashboard() {
   const load = useCallback(async (userId: string, date: string) => {
     const l = await getOrCreateLog(userId, date)
     setLog(l)
+    logRef.current = l
     if (l) setActivities(await getActivities(l.id))
   }, [])
 
@@ -211,6 +213,43 @@ export default function Dashboard() {
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
+
+  // 자정 자동 날짜 전환 + 전날 일지 마무리
+  useEffect(() => {
+    if (!profile) return
+    let midnightTimeout: ReturnType<typeof setTimeout>
+    let dailyInterval: ReturnType<typeof setInterval>
+
+    function msUntilMidnight() {
+      const now = new Date()
+      const midnight = new Date(now)
+      midnight.setHours(24, 0, 0, 0)
+      return midnight.getTime() - now.getTime()
+    }
+
+    async function handleMidnight() {
+      // 전날 일지가 근무중이면 자동 마무리
+      const prevLog = logRef.current
+      if (prevLog?.is_working) {
+        await updateLogWorking(prevLog.id, false)
+        setLog(prev => prev ? { ...prev, is_working: false } : prev)
+      }
+      // 오늘 날짜로 전환
+      const today = toDateStr(new Date())
+      setSelectedDate(today)
+      await load(profile.id, today)
+    }
+
+    midnightTimeout = setTimeout(() => {
+      handleMidnight()
+      dailyInterval = setInterval(handleMidnight, 24 * 60 * 60 * 1000)
+    }, msUntilMidnight())
+
+    return () => {
+      clearTimeout(midnightTimeout)
+      clearInterval(dailyInterval)
+    }
+  }, [profile?.id, load])
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -376,7 +415,7 @@ export default function Dashboard() {
     if (!log) return
     const next = !log.is_working
     await updateLogWorking(log.id, next)
-    setLog(prev => prev ? { ...prev, is_working: next } : prev)
+    setLog(prev => { const updated = prev ? { ...prev, is_working: next } : prev; logRef.current = updated; return updated })
   }
 
   async function handleSummary() {
