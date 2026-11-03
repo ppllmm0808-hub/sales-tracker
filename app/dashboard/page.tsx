@@ -283,7 +283,7 @@ export default function Dashboard() {
           const data = await res.json()
           if (data?.address) {
             const a = data.address
-            const addr = [a.road, a.quarter || a.suburb, a.city_district || a.borough].filter(Boolean).join(' ') || data.display_name.split(',').slice(0,3).join(',').trim()
+            const addr = [a.city || a.county, a.city_district || a.borough, a.road].filter(Boolean).join(' ') || data.display_name.split(',').slice(0, 3).join(',').trim()
             setForm(p => ({ ...p, address: addr }))
           }
         } catch {}
@@ -335,7 +335,7 @@ export default function Dashboard() {
         const data = await res.json()
         if (data?.display_name) {
           const addr = data.address
-          const short = [addr?.road, addr?.quarter || addr?.suburb, addr?.city_district || addr?.borough].filter(Boolean).join(' ')
+          const short = [addr?.city || addr?.county, addr?.city_district || addr?.borough, addr?.road].filter(Boolean).join(' ')
           setForm(p => ({ ...p, address: short || data.display_name.split(',').slice(0, 3).join(',').trim() }))
         }
       } catch {}
@@ -397,7 +397,7 @@ export default function Dashboard() {
         const data = await res.json()
         if (data?.address) {
           const a = data.address
-          address = [a.road, a.quarter || a.suburb, a.city_district || a.borough, a.city || a.county].filter(Boolean).join(' ') || data.display_name.split(',').slice(0, 3).join(',').trim()
+          address = [a.city || a.county, a.city_district || a.borough, a.road].filter(Boolean).join(' ') || data.display_name.split(',').slice(0, 3).join(',').trim()
         }
       } catch {}
       await checkInLog(log.id, time, lat, lng, address)
@@ -785,11 +785,11 @@ export default function Dashboard() {
                   <button type="button" onClick={captureGPS} disabled={gpsLoading} style={{
                     background: formCoords ? '#dcfce7' : '#ede9fe',
                     border: `1px solid ${formCoords ? '#86efac' : '#a5b4fc'}`,
-                    borderRadius: 8, padding: '4px 10px',
+                    borderRadius: 6, padding: '2px 7px',
                     color: formCoords ? '#15803d' : '#4338ca', cursor: 'pointer',
-                    fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
+                    fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
                   }}>
-                    {gpsLoading ? '📡 확인 중...' : formCoords ? '✅ GPS 완료' : '📍 GPS'}
+                    {gpsLoading ? '📡' : formCoords ? '✅' : '📍 GPS'}
                   </button>
                 </div>
                 <input type="text" value={form.address} onChange={e => { setForm(p => ({ ...p, address: e.target.value })); setFormCoords(null) }} style={inp} placeholder="주소 직접 입력 또는 GPS 버튼으로 자동 입력" />
