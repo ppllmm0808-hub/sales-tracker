@@ -131,13 +131,19 @@ export default function AdminPage() {
   const [members, setMembers] = useState<MemberData[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState<'list' | 'map' | 'users'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'map' | 'users' | 'export'>('list')
   const [users, setUsers] = useState<Profile[]>([])
   const [userForm, setUserForm] = useState({ email: '', password: '', name: '', role: 'member' })
   const [editUser, setEditUser] = useState<Profile | null>(null)
   const [editForm, setEditForm] = useState({ name: '', role: 'member', password: '' })
   const [userLoading, setUserLoading] = useState(false)
   const [userMsg, setUserMsg] = useState('')
+  const [exportStart, setExportStart] = useState(() => {
+    const d = new Date(); d.setDate(1); return toDateStr(d)
+  })
+  const [exportEnd, setExportEnd] = useState(toDateStr(new Date()))
+  const [exporting, setExporting] = useState(false)
+  const [exportMsg, setExportMsg] = useState('')
 
   const loadData = useCallback(async (date: string) => {
     setLoading(true)
@@ -223,6 +229,53 @@ export default function AdminPage() {
     await loadUsers(token)
   }
 
+  async function handleExport() {
+    setExporting(true); setExportMsg('')
+    const token = await getToken()
+    const res = await fetch(`/api/admin/export?start=${exportStart}&end=${exportEnd}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) { setExportMsg('❌ 데이터 조회 실패'); setExporting(false); return }
+    const data: any[] = await res.json()
+    if (data.length === 0) { setExportMsg('⚠️ 해당 기간에 데이터가 없습니다'); setExporting(false); return }
+
+    const escape = (v: any) => {
+      if (v == null) return ''
+      const s = String(v)
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+    }
+
+    const headers = ['날짜','담당자명','이메일','출근시간','출근위치','활동시간','종료시간','활동유형','업체명','담당자(거래처)','주소','활동내용','결과','다음행동예정']
+    const rows: string[][] = []
+
+    for (const log of data) {
+      const name = log.profiles?.name || ''
+      const email = log.profiles?.email || ''
+      if (log.activities.length === 0) {
+        rows.push([log.log_date, name, email, log.check_in_time || '', log.check_in_address || '', '', '', '', '', '', '', '', '', ''])
+      } else {
+        for (const act of log.activities) {
+          rows.push([
+            log.log_date, name, email,
+            log.check_in_time || '', log.check_in_address || '',
+            act.activity_time || '', act.end_time || '', act.activity_type || '',
+            act.company || '', act.contact || '', act.address || '',
+            act.content || '', act.result || '', act.next_action || '',
+          ])
+        }
+      }
+    }
+
+    const csv = '﻿' + [headers, ...rows].map(r => r.map(escape).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `영업일지_${exportStart}_${exportEnd}.csv`
+    a.click(); URL.revokeObjectURL(url)
+    setExportMsg(`✅ ${rows.length}행 다운로드 완료`)
+    setExporting(false)
+  }
+
   const checkedIn = members.filter(m => m.log.check_in_time).length
   const totalActs = members.reduce((s, m) => s + m.activities.length, 0)
   const contracts = members.reduce((s, m) => s + m.activities.filter(a => a.activity_type === '계약').length, 0)
@@ -271,10 +324,51 @@ export default function AdminPage() {
 
         {/* 탭 */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {([['list','👥 팀원 현황'],['map','🗺️ 이동 경로'],['users','⚙️ 계정 관리']] as const).map(([m, label]) => (
+          {([['list','👥 팀원 현황'],['map','🗺️ 이동 경로'],['users','⚙️ 계정 관리'],['export','📥 내보내기']] as const).map(([m, label]) => (
             <button key={m} onClick={() => { setViewMode(m); setUserMsg('') }} style={{ padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === m ? '#0f172a' : '#f1f5f9', color: viewMode === m ? '#fff' : '#64748b' }}>{label}</button>
           ))}
         </div>
+
+        {/* 내보내기 탭 */}
+        {viewMode === 'export' && (
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 32, maxWidth: 520 }}>
+            <h3 style={{ fontWeight: 700, fontSize: 18, color: '#0f172a', marginBottom: 6 }}>📥 활동 데이터 내보내기</h3>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 24 }}>기간을 선택하면 모든 담당자의 일지와 활동 내역을 CSV 파일로 다운로드합니다.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#475569' }}>
+                시작일
+                <input type="date" value={exportStart} onChange={e => setExportStart(e.target.value)}
+                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px', fontSize: 14, color: '#1e293b' }} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#475569' }}>
+                종료일
+                <input type="date" value={exportEnd} onChange={e => setExportEnd(e.target.value)}
+                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px', fontSize: 14, color: '#1e293b' }} />
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+              {[
+                { label: '이번 달', fn: () => { const d = new Date(); d.setDate(1); setExportStart(toDateStr(d)); setExportEnd(toDateStr(new Date())) } },
+                { label: '지난 달', fn: () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); const e = new Date(d.getFullYear(), d.getMonth() + 1, 0); setExportStart(toDateStr(d)); setExportEnd(toDateStr(e)) } },
+                { label: '최근 7일', fn: () => { const d = new Date(); d.setDate(d.getDate() - 6); setExportStart(toDateStr(d)); setExportEnd(toDateStr(new Date())) } },
+                { label: '최근 30일', fn: () => { const d = new Date(); d.setDate(d.getDate() - 29); setExportStart(toDateStr(d)); setExportEnd(toDateStr(new Date())) } },
+              ].map(b => (
+                <button key={b.label} onClick={b.fn} style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>{b.label}</button>
+              ))}
+            </div>
+            {exportMsg && <p style={{ fontSize: 13, color: exportMsg.startsWith('✅') ? '#059669' : exportMsg.startsWith('⚠️') ? '#d97706' : '#dc2626', marginBottom: 12 }}>{exportMsg}</p>}
+            <button onClick={handleExport} disabled={exporting} style={{ width: '100%', background: '#0f172a', border: 'none', borderRadius: 10, padding: '13px', color: '#fff', fontWeight: 700, fontSize: 15, cursor: exporting ? 'wait' : 'pointer' }}>
+              {exporting ? '⏳ 데이터 조회 중...' : '📥 CSV 다운로드'}
+            </button>
+            <div style={{ marginTop: 20, padding: 14, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 12, color: '#64748b', lineHeight: 1.9 }}>
+              <b style={{ color: '#475569' }}>CSV 파일 포함 항목</b><br />
+              날짜 · 담당자명 · 이메일 · 출근시간 · 출근위치<br />
+              활동시간 · 종료시간 · 활동유형 · 업체명 · 담당자(거래처)<br />
+              주소 · 활동내용 · 결과 · 다음행동예정<br />
+              <span style={{ color: '#94a3b8' }}>※ Excel에서 열면 자동으로 표 형식으로 정렬됩니다</span>
+            </div>
+          </div>
+        )}
 
         {/* 계정 관리 탭 */}
         {viewMode === 'users' && (
@@ -372,14 +466,14 @@ export default function AdminPage() {
           </div>
         )}
 
-        {loading && viewMode !== 'users' ? (
+        {loading && viewMode !== 'users' && viewMode !== 'export' ? (
           <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>불러오는 중...</div>
-        ) : viewMode !== 'users' && members.length === 0 ? (
+        ) : viewMode !== 'users' && viewMode !== 'export' && members.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 60, background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', color: '#94a3b8' }}>
             <p style={{ fontSize: 36 }}>📋</p>
             <p style={{ marginTop: 8 }}>이 날짜에 등록된 활동이 없습니다</p>
           </div>
-        ) : viewMode === 'map' ? (
+        ) : viewMode === 'export' ? null : viewMode === 'map' ? (
           <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 20 }}>
             <div style={{ marginBottom: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {members.map(m => (
