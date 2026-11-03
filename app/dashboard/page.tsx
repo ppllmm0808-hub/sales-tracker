@@ -53,35 +53,59 @@ function MapPanel({ activities }: { activities: Activity[] }) {
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null }
       const map = L.map(mapRef.current).setView([37.5665, 126.9780], 12)
       mapInstanceRef.current = map
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>'
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd', maxZoom: 19,
       }).addTo(map)
       const pts = activities.filter(a => a.lat && a.lng)
       if (pts.length > 0) {
         const bounds = L.latLngBounds(pts.map(a => [a.lat!, a.lng!]))
-        map.fitBounds(bounds, { padding: [50, 50] })
+        map.fitBounds(bounds, { padding: [60, 60] })
+        // 이동 경로 라인 (굵고 명확하게)
+        if (pts.length > 1) {
+          L.polyline(pts.map(a => [a.lat!, a.lng!]), {
+            color: '#4f46e5', weight: 4, opacity: 0.8,
+          }).addTo(map)
+          // 방향 화살표 (중간 지점마다)
+          for (let i = 0; i < pts.length - 1; i++) {
+            const p1 = pts[i], p2 = pts[i + 1]
+            const midLat = (p1.lat! + p2.lat!) / 2
+            const midLng = (p1.lng! + p2.lng!) / 2
+            const angle = Math.atan2(p2.lng! - p1.lng!, p2.lat! - p1.lat!) * 180 / Math.PI
+            const arrowIcon = L.divIcon({
+              className: '',
+              html: `<div style="transform:rotate(${angle}deg);color:#4f46e5;font-size:18px;line-height:1;text-shadow:0 0 3px #fff">➤</div>`,
+              iconSize: [20, 20], iconAnchor: [10, 10],
+            })
+            L.marker([midLat, midLng], { icon: arrowIcon }).addTo(map)
+          }
+        }
+        // 활동 핀
         pts.forEach((act, i) => {
           const s = TYPE_STYLE[act.activity_type] || TYPE_STYLE['기타']
+          const isFirst = i === 0, isLast = i === pts.length - 1
           const icon = L.divIcon({
             className: '',
-            html: `<div style="background:${s.text};color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer">${i + 1}</div>`,
-            iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -16],
+            html: `<div style="position:relative">
+              <div style="background:${isFirst ? '#059669' : isLast ? '#dc2626' : s.text};color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.4);cursor:pointer">${i + 1}</div>
+              ${isFirst ? '<div style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);background:#059669;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;white-space:nowrap">출발</div>' : ''}
+              ${isLast ? '<div style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;white-space:nowrap">도착</div>' : ''}
+            </div>`,
+            iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -20],
           })
           L.marker([act.lat!, act.lng!], { icon }).addTo(map).bindPopup(`
-            <div style="min-width:180px;font-family:system-ui;font-size:13px">
-              <div style="font-weight:700;margin-bottom:4px;color:#1e293b">${i + 1}. ${act.activity_time}${act.end_time ? '~' + act.end_time : ''} [${act.activity_type}]</div>
-              ${act.company ? `<div style="font-weight:600;color:#0f172a">${act.company}</div>` : ''}
+            <div style="min-width:200px;font-family:system-ui;font-size:13px;line-height:1.5">
+              <div style="font-weight:700;margin-bottom:6px;color:#1e293b;font-size:14px">${i + 1}. ${act.activity_time}${act.end_time ? ' ~ ' + act.end_time : ''}</div>
+              <div style="display:inline-block;background:${s.bg};color:${s.text};border-radius:12px;padding:2px 8px;font-size:11px;font-weight:600;margin-bottom:6px">${s.icon} ${act.activity_type}</div>
+              ${act.company ? `<div style="font-weight:600;color:#0f172a;font-size:14px">${act.company}</div>` : ''}
               ${act.address ? `<div style="color:#64748b;font-size:12px;margin-top:2px">📍 ${act.address}</div>` : ''}
               ${act.contact ? `<div style="color:#64748b;font-size:12px">👤 ${act.contact}</div>` : ''}
-              ${act.content ? `<div style="margin-top:6px;color:#334155">${act.content}</div>` : ''}
-              ${act.result ? `<div style="color:#059669;margin-top:4px">✅ ${act.result}</div>` : ''}
-              ${act.next_action ? `<div style="color:#4338ca;margin-top:4px">➡️ ${act.next_action}</div>` : ''}
+              ${act.content ? `<div style="margin-top:6px;color:#334155;font-size:12px;border-top:1px solid #f1f5f9;padding-top:6px">${act.content}</div>` : ''}
+              ${act.result ? `<div style="color:#059669;margin-top:4px;font-size:12px">✅ ${act.result}</div>` : ''}
+              ${act.next_action ? `<div style="color:#4338ca;margin-top:4px;font-size:12px">➡️ ${act.next_action}</div>` : ''}
             </div>
-          `)
+          `, { maxWidth: 260 })
         })
-        if (pts.length > 1) {
-          const line = L.polyline(pts.map(a => [a.lat!, a.lng!]), { color: '#4f46e5', weight: 2, opacity: 0.5, dashArray: '6,4' }).addTo(map)
-        }
       }
     }
     if ((window as any).L) { initMap(); return }
@@ -517,7 +541,7 @@ export default function Dashboard() {
                 </button>
               </div>
               <div style={{ fontSize: 12, color: '#64748b' }}>
-                {viewMode === 'timeline' ? '시간대별 활동 내역을 순서대로 관리합니다.' : '주소 입력 시 자동으로 지도에 핀이 표시됩니다.'}
+                {viewMode === 'timeline' ? '시간대별 활동 내역을 순서대로 관리합니다.' : '오늘의 영업 이동 경로 · 핀을 클릭하면 상세 정보가 표시됩니다.'}
               </div>
             </div>
             <button onClick={async () => {
@@ -604,7 +628,7 @@ export default function Dashboard() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', width: '100%', maxWidth: 520, overflow: 'hidden' }}>
             <div style={{ background: '#4f46e5', color: '#fff', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, fontSize: 16 }}>➕ {editTarget ? '활동 수정' : '영업 활동 등록'}</span>
+              <span style={{ fontWeight: 700, fontSize: 16 }}>💼 {editTarget ? '영업 활동 수정' : '영업 활동 등록'}</span>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>✕</button>
             </div>
             <form onSubmit={handleSave} style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -612,30 +636,30 @@ export default function Dashboard() {
               <label style={lbl}>종료 시간<input type="time" value={form.end_time} onChange={e => setForm(p => ({ ...p, end_time: e.target.value }))} style={inp} /></label>
               <label style={lbl}>활동 구분 *
                 <select value={form.activity_type} onChange={e => setForm(p => ({ ...p, activity_type: e.target.value }))} style={inp}>
-                  {ACTIVITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  {ACTIVITY_TYPES.map(t => <option key={t} value={t}>{TYPE_STYLE[t]?.icon} {t}</option>)}
                 </select>
               </label>
-              <label style={lbl}>거래처/장소<input type="text" value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))} style={inp} placeholder="회사명 또는 장소" /></label>
+              <label style={lbl}>거래처 / 방문지명<input type="text" value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))} style={inp} placeholder="거래처명 또는 방문 장소" /></label>
               <label style={{ ...lbl, gridColumn: '1/-1' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>주소</span>
+                  <span>방문 위치 (주소/도시명)</span>
                   <button type="button" onClick={captureGPS} disabled={gpsLoading} style={{
-                    background: formCoords ? '#dcfce7' : '#eef2ff', border: `1px solid ${formCoords ? '#86efac' : '#c7d2fe'}`,
-                    borderRadius: 6, padding: '2px 10px', fontSize: 12, fontWeight: 600,
-                    color: formCoords ? '#15803d' : '#4338ca', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                    background: 'none', border: 'none', padding: '2px 0',
+                    color: formCoords ? '#15803d' : '#4338ca', cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
                   }}>
-                    {gpsLoading ? '📡 위치 가져오는 중...' : formCoords ? `✅ GPS 저장됨 (${formCoords.lat.toFixed(4)}, ${formCoords.lng.toFixed(4)})` : '📍 현재 GPS 위치 캡처'}
+                    {gpsLoading ? '📡 위치 확인 중...' : formCoords ? `✅ GPS (${formCoords.lat.toFixed(4)}, ${formCoords.lng.toFixed(4)})` : '📍 GPS 현재 위치'}
                   </button>
                 </div>
-                <input type="text" value={form.address} onChange={e => { setForm(p => ({ ...p, address: e.target.value })); setFormCoords(null) }} style={inp} placeholder="서울시 강남구 테헤란로 123 또는 GPS 버튼 클릭" />
+                <input type="text" value={form.address} onChange={e => { setForm(p => ({ ...p, address: e.target.value })); setFormCoords(null) }} style={inp} placeholder="주소 직접 입력 또는 GPS 버튼으로 자동 입력" />
               </label>
+              <label style={{ ...lbl, gridColumn: '1/-1' }}>주요 활동 내용<textarea value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))} style={{ ...inp, height: 90, resize: 'vertical' }} placeholder="미팅 내용, 상담 결과, 주요 논의 사항 등을 기록하세요" /></label>
               <label style={lbl}>담당자<input type="text" value={form.contact} onChange={e => setForm(p => ({ ...p, contact: e.target.value }))} style={inp} placeholder="담당자명" /></label>
-              <label style={lbl}>결과<input type="text" value={form.result} onChange={e => setForm(p => ({ ...p, result: e.target.value }))} style={inp} placeholder="계약/검토중 등" /></label>
-              <label style={{ ...lbl, gridColumn: '1/-1' }}>활동 내용<textarea value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))} style={{ ...inp, height: 80, resize: 'vertical' }} placeholder="활동 내용 입력..." /></label>
-              <label style={{ ...lbl, gridColumn: '1/-1' }}>다음 액션<input type="text" value={form.next_action} onChange={e => setForm(p => ({ ...p, next_action: e.target.value }))} style={inp} placeholder="다음 할 일 또는 후속조치" /></label>
-              <div style={{ gridColumn: '1/-1', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <label style={lbl}>결과<input type="text" value={form.result} onChange={e => setForm(p => ({ ...p, result: e.target.value }))} style={inp} placeholder="계약/검토중/보류 등" /></label>
+              <label style={{ ...lbl, gridColumn: '1/-1' }}>비고 / 다음 액션 플랜<input type="text" value={form.next_action} onChange={e => setForm(p => ({ ...p, next_action: e.target.value }))} style={inp} placeholder="다음 방문 일정, 후속 조치, 준비 사항 등" /></label>
+              <div style={{ gridColumn: '1/-1', display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
                 <button type="button" onClick={() => setShowModal(false)} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 20px', color: '#475569', cursor: 'pointer' }}>취소</button>
-                <button type="submit" style={{ background: '#4f46e5', border: 'none', borderRadius: 8, padding: '10px 24px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>저장</button>
+                <button type="submit" style={{ background: '#4f46e5', border: 'none', borderRadius: 8, padding: '10px 28px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 15 }}>저장하기</button>
               </div>
             </form>
           </div>
