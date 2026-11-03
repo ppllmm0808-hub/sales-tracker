@@ -511,9 +511,6 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
-                <button onClick={handleCheckIn} disabled={checkInLoading} style={{ marginTop: 10, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, padding: '6px 14px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>
-                  🔄 재체크인
-                </button>
               </div>
             ) : (
               <div>
