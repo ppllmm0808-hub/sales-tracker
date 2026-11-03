@@ -19,7 +19,12 @@ const TYPE_STYLE: Record<string, { bg: string; text: string; icon: string }> = {
   '기타': { bg: '#f1f5f9', text: '#475569', icon: '📌' },
 }
 
-function toDateStr(d: Date) { return d.toISOString().split('T')[0] }
+function toDateStr(d: Date) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
