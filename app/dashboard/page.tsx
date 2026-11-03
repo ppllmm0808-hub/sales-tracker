@@ -1,13 +1,38 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase, getOrCreateLog, getActivities, saveActivity, deleteActivity, updateLogSummary, updateLogWorking, getProfile } from '@/lib/supabase'
+import { supabase, getOrCreateLog, getActivities, saveActivity, deleteActivity, updateActivity, updateLogSummary, updateLogWorking, getProfile } from '@/lib/supabase'
 import type { Activity, SalesLog, Profile } from '@/lib/supabase'
 
-const ACTIVITY_TYPES = ['방문', '전화', '미팅', '이메일', '제안', '계약', '기타']
+const ACTIVITY_TYPES = ['내근', '이동', '미팅', '식사', '방문', '전화', '이메일', '제안', '계약', '기타']
 
-function toDateStr(d: Date) {
-  return d.toISOString().split('T')[0]
+const TYPE_STYLE: Record<string, { bg: string; text: string; icon: string }> = {
+  '내근': { bg: '#dbeafe', text: '#1d4ed8', icon: '💻' },
+  '이동': { bg: '#fef3c7', text: '#b45309', icon: '🚗' },
+  '미팅': { bg: '#e0e7ff', text: '#4338ca', icon: '👥' },
+  '식사': { bg: '#d1fae5', text: '#065f46', icon: '🍽️' },
+  '방문': { bg: '#dbeafe', text: '#1e40af', icon: '📍' },
+  '전화': { bg: '#d1fae5', text: '#047857', icon: '📞' },
+  '이메일': { bg: '#f3e8ff', text: '#6b21a8', icon: '📧' },
+  '제안': { bg: '#fce7f3', text: '#be185d', icon: '📄' },
+  '계약': { bg: '#d1fae5', text: '#065f46', icon: '✍️' },
+  '기타': { bg: '#f1f5f9', text: '#475569', icon: '📌' },
+}
+
+function toDateStr(d: Date) { return d.toISOString().split('T')[0] }
+
+function calcWorkHours(acts: Activity[]) {
+  if (!acts.length) return '0시간'
+  const sorted = [...acts].sort((a, b) => a.activity_time.localeCompare(b.activity_time))
+  const first = sorted[0].activity_time
+  const lastAct = sorted[sorted.length - 1]
+  const last = lastAct.end_time || lastAct.activity_time
+  if (!first || !last) return '-'
+  const [h1, m1] = first.split(':').map(Number)
+  const [h2, m2] = last.split(':').map(Number)
+  const mins = (h2 * 60 + m2) - (h1 * 60 + m1)
+  if (mins <= 0) return '-'
+  return `${Math.floor(mins / 60)}시간 ${mins % 60}분`
 }
 
 export default function Dashboard() {
@@ -16,19 +41,17 @@ export default function Dashboard() {
   const [log, setLog] = useState<SalesLog | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
   const [selectedDate, setSelectedDate] = useState(toDateStr(new Date()))
-  const [showForm, setShowForm] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [showModal, setShowModal] = useState(false)
+  const [editTarget, setEditTarget] = useState<Activity | null>(null)
   const [form, setForm] = useState({
-    activity_time: '', activity_type: '방문', company: '', contact: '', content: '', result: '', lat: '', lng: '',
+    activity_time: '', end_time: '', activity_type: '미팅',
+    company: '', contact: '', address: '', content: '', result: '', next_action: '',
   })
 
   const load = useCallback(async (userId: string, date: string) => {
     const l = await getOrCreateLog(userId, date)
     setLog(l)
-    if (l) {
-      const acts = await getActivities(l.id)
-      setActivities(acts)
-    }
+    if (l) setActivities(await getActivities(l.id))
   }, [])
 
   useEffect(() => {
@@ -39,41 +62,58 @@ export default function Dashboard() {
         if (!p) { router.push('/login'); return }
         setProfile(p)
         await load(data.session.user.id, selectedDate)
-      } catch {
-        router.push('/login')
-      }
+      } catch { router.push('/login') }
     }).catch(() => router.push('/login'))
   }, [router, load, selectedDate])
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/login')
+  function openAdd() {
+    setEditTarget(null)
+    setForm({ activity_time: '', end_time: '', activity_type: '미팅', company: '', contact: '', address: '', content: '', result: '', next_action: '' })
+    setShowModal(true)
+  }
+
+  function openEdit(act: Activity) {
+    setEditTarget(act)
+    setForm({
+      activity_time: act.activity_time, end_time: act.end_time || '',
+      activity_type: act.activity_type, company: act.company || '',
+      contact: act.contact || '', address: act.address || '',
+      content: act.content || '', result: act.result || '',
+      next_action: act.next_action || '',
+    })
+    setShowModal(true)
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!log || !profile) return
-    await saveActivity({
-      log_id: log.id, user_id: profile.id,
-      activity_time: form.activity_time, activity_type: form.activity_type,
-      company: form.company || null, contact: form.contact || null,
-      content: form.content || null, result: form.result || null,
-      lat: form.lat ? parseFloat(form.lat) : null,
-      lng: form.lng ? parseFloat(form.lng) : null,
-    })
-    setForm({ activity_time: '', activity_type: '방문', company: '', contact: '', content: '', result: '', lat: '', lng: '' })
-    setShowForm(false)
+    if (editTarget) {
+      await updateActivity(editTarget.id, {
+        activity_time: form.activity_time, end_time: form.end_time || null,
+        activity_type: form.activity_type, company: form.company || null,
+        contact: form.contact || null, address: form.address || null,
+        content: form.content || null, result: form.result || null,
+        next_action: form.next_action || null,
+      })
+    } else {
+      await saveActivity({
+        log_id: log.id, user_id: profile.id,
+        activity_time: form.activity_time, end_time: form.end_time || null,
+        activity_type: form.activity_type, company: form.company || null,
+        contact: form.contact || null, address: form.address || null,
+        content: form.content || null, result: form.result || null,
+        next_action: form.next_action || null,
+        lat: null, lng: null,
+      })
+    }
+    setShowModal(false)
     await load(profile.id, selectedDate)
   }
 
   async function handleDelete(id: string) {
-    if (deleteTarget === id) {
-      await deleteActivity(id)
-      setDeleteTarget(null)
-      if (profile) await load(profile.id, selectedDate)
-    } else {
-      setDeleteTarget(id)
-    }
+    if (!confirm('삭제하시겠습니까?')) return
+    await deleteActivity(id)
+    if (profile) await load(profile.id, selectedDate)
   }
 
   async function handleToggleWorking() {
@@ -85,154 +125,269 @@ export default function Dashboard() {
 
   async function handleSummary() {
     if (!log) return
-    const text = activities.map(a =>
-      `${a.activity_time} [${a.activity_type}] ${a.company ?? ''} ${a.contact ?? ''}: ${a.content ?? ''} → ${a.result ?? ''}`
+    const text = sorted.map(a =>
+      `${a.activity_time}${a.end_time ? '~' + a.end_time : ''} [${a.activity_type}] ${a.company || ''} ${a.contact || ''}: ${a.content || ''} → ${a.result || ''}`
     ).join('\n')
     await updateLogSummary(log.id, `총 ${activities.length}건 활동\n${text}`)
     alert('요약이 저장되었습니다.')
   }
 
+  function exportCSV() {
+    const header = '시간,종료,유형,거래처,담당자,주소,내용,결과,다음액션'
+    const rows = sorted.map(a =>
+      [a.activity_time, a.end_time || '', a.activity_type, a.company || '', a.contact || '', a.address || '', a.content || '', a.result || '', a.next_action || ''].join(',')
+    )
+    const csv = [header, ...rows].join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `영업일지_${selectedDate}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function copyToClipboard() {
+    const text = sorted.map(a =>
+      `${a.activity_time}${a.end_time ? '~' + a.end_time : ''}\t${a.activity_type}\t${a.company || ''}\t${a.address || ''}\t${a.content || ''}\t${a.result || ''}\t${a.next_action || ''}`
+    ).join('\n')
+    navigator.clipboard.writeText(text).then(() => alert('클립보드에 복사되었습니다.'))
+  }
+
   const sorted = [...activities].sort((a, b) => a.activity_time.localeCompare(b.activity_time))
+  const visitCount = activities.filter(a => ['방문', '미팅'].includes(a.activity_type)).length
+  const workHours = calcWorkHours(activities)
 
   if (!profile) return (
-    <div style={{ minHeight: '100vh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ color: '#fff' }}>로딩 중...</p>
+    <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: '#64748b' }}>로딩 중...</p>
     </div>
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f172a', color: '#e2e8f0' }}>
-      <header style={{ background: 'rgba(15,23,42,0.95)', borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <h1 style={{ fontSize: 18, fontWeight: 700, color: '#4fc3f7' }}>영업활동일지</h1>
-          <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: '6px 12px', color: '#fff', fontSize: 14 }} />
-        </div>
+    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      {/* Header */}
+      <header style={{ background: '#4f46e5', color: '#fff', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>
+          <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: '6px 10px', fontSize: 20 }}>💼</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>영업활동일지</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>8시간 타임라인 영업활동 자동화 시스템</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={exportCSV} style={headerBtn('#059669')}>📥 CSV</button>
+          <button onClick={copyToClipboard} style={headerBtn('#0284c7')}>📋 복사</button>
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginLeft: 8 }}>
             {profile.name || profile.email}
-            {profile.role === 'admin' && <span style={{ marginLeft: 6, background: '#f59e0b', color: '#000', borderRadius: 4, padding: '2px 6px', fontSize: 11 }}>관리자</span>}
+            {profile.role === 'admin' && <span style={{ marginLeft: 6, background: '#f59e0b', color: '#000', borderRadius: 4, padding: '1px 6px', fontSize: 11 }}>관리자</span>}
           </span>
-          <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '6px 14px', color: '#fff', cursor: 'pointer', fontSize: 13 }}>로그아웃</button>
+          <button onClick={async () => { await supabase.auth.signOut(); router.push('/login') }} style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, padding: '6px 14px', color: '#fff', cursor: 'pointer', fontSize: 13 }}>로그아웃</button>
         </div>
       </header>
 
-      <main style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-          {[
-            { label: '총 활동', value: activities.length + '건' },
-            { label: '방문', value: activities.filter(a => a.activity_type === '방문').length + '건' },
-            { label: '계약', value: activities.filter(a => a.activity_type === '계약').length + '건' },
-          ].map(s => (
-            <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '16px 20px' }}>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginBottom: 4 }}>{s.label}</p>
-              <p style={{ fontSize: 24, fontWeight: 700, color: '#4fc3f7' }}>{s.value}</p>
+      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20 }}>
+        {/* Left Column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Date & Status */}
+          <div style={card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>📅</span>
+                <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
+                  style={{ fontWeight: 600, fontSize: 14, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '4px 8px' }} />
+              </div>
+              {log && (
+                <button onClick={handleToggleWorking} style={{
+                  background: log.is_working ? '#dcfce7' : '#fee2e2',
+                  color: log.is_working ? '#15803d' : '#dc2626',
+                  border: 'none', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: log.is_working ? '#22c55e' : '#ef4444', display: 'inline-block' }} />
+                  {log.is_working ? '근무 진행중' : '휴무'}
+                </button>
+              )}
             </div>
-          ))}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={statBox('#f8fafc', '#64748b', '#1e293b')}>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>총 근무 시간</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b' }}>{workHours}</div>
+                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>목표: 09:00~18:00</div>
+              </div>
+              <div style={statBox('#eef2ff', '#4f46e5', '#312e81')}>
+                <div style={{ fontSize: 11, color: '#4f46e5', marginBottom: 2 }}>총 활동</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#312e81' }}>{activities.length}건</div>
+                <div style={{ fontSize: 10, color: '#818cf8', marginTop: 2 }}>오늘 기록</div>
+              </div>
+              <div style={statBox('#ecfdf5', '#059669', '#064e3b')}>
+                <div style={{ fontSize: 11, color: '#059669', marginBottom: 2 }}>방문/미팅</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#064e3b' }}>{visitCount}곳</div>
+                <div style={{ fontSize: 10, color: '#34d399', marginTop: 2 }}>대면 협의</div>
+              </div>
+              <div style={statBox('#fffbeb', '#b45309', '#78350f')}>
+                <div style={{ fontSize: 11, color: '#b45309', marginBottom: 2 }}>계약</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#78350f' }}>{activities.filter(a => a.activity_type === '계약').length}건</div>
+                <div style={{ fontSize: 10, color: '#fbbf24', marginTop: 2 }}>성사 건수</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Add Button */}
+          <button onClick={openAdd} disabled={!log?.is_working} style={{
+            background: log?.is_working ? '#4f46e5' : '#94a3b8',
+            color: '#fff', border: 'none', borderRadius: 12, padding: '14px',
+            fontSize: 15, fontWeight: 600, cursor: log?.is_working ? 'pointer' : 'not-allowed',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            boxShadow: log?.is_working ? '0 4px 12px rgba(79,70,229,0.3)' : 'none',
+          }}>
+            ➕ 새 영업 활동 추가
+          </button>
+
+          {/* Summary Box */}
+          <div style={{ background: 'linear-gradient(135deg, #312e81 0%, #0f172a 100%)', borderRadius: 16, padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontWeight: 700, fontSize: 14 }}>
+                🤖 일일 요약 리포트
+              </div>
+              <button onClick={handleSummary} disabled={!log?.is_working} style={{ background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(129,140,248,0.4)', borderRadius: 6, padding: '4px 10px', color: '#c7d2fe', fontSize: 12, cursor: 'pointer' }}>요약 저장</button>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 12, border: '1px solid rgba(255,255,255,0.1)', minHeight: 80 }}>
+              {log?.summary ? (
+                <pre style={{ fontSize: 12, color: '#cbd5e1', whiteSpace: 'pre-wrap', lineHeight: 1.6, margin: 0 }}>{log.summary}</pre>
+              ) : (
+                <p style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6, margin: 0 }}>활동 내역을 등록한 후 [요약 저장] 버튼을 누르면 오늘의 영업활동을 정리합니다.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Clipboard */}
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 14, color: '#334155', marginBottom: 8 }}>
+              📊 구글 스프레드시트 복사
+            </div>
+            <p style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, marginBottom: 12 }}>
+              클릭 한 번으로 타임라인 전체 내용을 탭 구분 텍스트로 복사하여 엑셀/스프레드시트에 바로 붙여넣을 수 있습니다.
+            </p>
+            <button onClick={copyToClipboard} style={{ width: '100%', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px', color: '#475569', fontSize: 13, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              📋 클립보드에 일지 복사하기
+            </button>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600 }}>타임라인</h2>
-            {log && (
-              <button onClick={handleToggleWorking} style={{
-                background: log.is_working ? 'rgba(129,199,132,0.15)' : 'rgba(239,68,68,0.15)',
-                border: `1px solid ${log.is_working ? 'rgba(129,199,132,0.4)' : 'rgba(239,68,68,0.4)'}`,
-                borderRadius: 20, padding: '4px 14px', color: log.is_working ? '#81c784' : '#ef4444',
-                cursor: 'pointer', fontSize: 12, fontWeight: 600,
-              }}>
-                {log.is_working ? '✓ 근무중' : '✕ 휴무'}
-              </button>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handleSummary} disabled={!log?.is_working} style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '8px 16px', color: '#f59e0b', cursor: log?.is_working ? 'pointer' : 'not-allowed', fontSize: 13, opacity: log?.is_working ? 1 : 0.4 }}>요약 저장</button>
-            <button onClick={() => setShowForm(!showForm)} disabled={!log?.is_working} style={{ background: log?.is_working ? 'linear-gradient(135deg, #4fc3f7, #0288d1)' : 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, padding: '8px 16px', color: '#fff', cursor: log?.is_working ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 600, opacity: log?.is_working ? 1 : 0.4 }}>+ 활동 추가</button>
-          </div>
-        </div>
-
-        {log && !log.is_working && (
-          <div style={{ textAlign: 'center', padding: '40px 0', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, marginBottom: 20 }}>
-            <p style={{ fontSize: 32 }}>🏖️</p>
-            <p style={{ color: '#ef4444', fontWeight: 600, marginTop: 8 }}>휴무일</p>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4 }}>연차/공휴일로 설정되었습니다</p>
-            <button onClick={handleToggleWorking} style={{ marginTop: 16, background: 'rgba(129,199,132,0.15)', border: '1px solid rgba(129,199,132,0.4)', borderRadius: 8, padding: '8px 20px', color: '#81c784', cursor: 'pointer', fontSize: 13 }}>근무로 변경</button>
-          </div>
-        )}
-
-        {showForm && (
-          <form onSubmit={handleSave} style={{ background: 'rgba(79,195,247,0.05)', border: '1px solid rgba(79,195,247,0.2)', borderRadius: 12, padding: 20, marginBottom: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <label style={lblStyle}>시간 *<input type="time" required value={form.activity_time} onChange={e => setForm(p => ({ ...p, activity_time: e.target.value }))} style={inpStyle} /></label>
-            <label style={lblStyle}>유형 *<select value={form.activity_type} onChange={e => setForm(p => ({ ...p, activity_type: e.target.value }))} style={inpStyle}>{ACTIVITY_TYPES.map(t => <option key={t} style={{ background: '#1a1a2e', color: '#fff' }}>{t}</option>)}</select></label>
-            <label style={lblStyle}>거래처<input type="text" value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))} style={inpStyle} placeholder="회사명" /></label>
-            <label style={lblStyle}>담당자<input type="text" value={form.contact} onChange={e => setForm(p => ({ ...p, contact: e.target.value }))} style={inpStyle} placeholder="담당자명" /></label>
-            <label style={{ ...lblStyle, gridColumn: '1/-1' }}>활동 내용<textarea value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))} style={{ ...inpStyle, height: 80, resize: 'vertical' }} placeholder="활동 내용 입력..." /></label>
-            <label style={{ ...lblStyle, gridColumn: '1/-1' }}>결과<input type="text" value={form.result} onChange={e => setForm(p => ({ ...p, result: e.target.value }))} style={inpStyle} placeholder="결과/후속조치" /></label>
-            <div style={{ gridColumn: '1/-1', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => setShowForm(false)} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 20px', color: '#fff', cursor: 'pointer' }}>취소</button>
-              <button type="submit" style={{ background: 'linear-gradient(135deg, #4fc3f7, #0288d1)', border: 'none', borderRadius: 8, padding: '8px 20px', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>저장</button>
+        {/* Right Column: Timeline */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ ...card, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16, color: '#1e293b' }}>8시간 근무 타임라인 (09:00 - 18:00)</div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>시간대별 위치 및 활동 내역을 순서대로 관리합니다.</div>
             </div>
-          </form>
-        )}
-
-        {sorted.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(255,255,255,0.3)' }}>
-            <p style={{ fontSize: 40 }}>📋</p>
-            <p style={{ marginTop: 8 }}>오늘의 활동을 기록하세요</p>
+            <button onClick={async () => {
+              if (!confirm('전체 삭제하시겠습니까?')) return
+              await Promise.all(activities.map(a => deleteActivity(a.id)))
+              if (profile) await load(profile.id, selectedDate)
+            }} style={{ color: '#e11d48', background: 'none', border: 'none', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+              🗑️ 전체 삭제
+            </button>
           </div>
-        ) : (
-          <div style={{ position: 'relative' }}>
-            <div style={{ position: 'absolute', left: 59, top: 20, bottom: 20, width: 2, background: 'rgba(79,195,247,0.2)', zIndex: 0 }} />
-            {sorted.map((act, idx) => {
-              const typeColor: Record<string, string> = { '방문': '#4fc3f7', '전화': '#81c784', '미팅': '#ffb74d', '이메일': '#ce93d8', '제안': '#f48fb1', '계약': '#a5d6a7', '기타': '#90a4ae' }
-              const color = typeColor[act.activity_type] || '#90a4ae'
-              const isLast = idx === sorted.length - 1
-              const timeDiff = isLast ? null : (() => {
-                const [h1, m1] = sorted[idx + 1].activity_time.split(':').map(Number)
-                const [h0, m0] = act.activity_time.split(':').map(Number)
-                const diff = (h1 * 60 + m1) - (h0 * 60 + m0)
-                return diff > 0 ? `${Math.floor(diff / 60) > 0 ? Math.floor(diff / 60) + '시간 ' : ''}${diff % 60}분 후` : null
-              })()
-              return (
-                <div key={act.id} style={{ display: 'flex', gap: 16, marginBottom: 12, position: 'relative', zIndex: 1 }}>
-                  <div style={{ width: 52, textAlign: 'right', flexShrink: 0, paddingTop: 16 }}>
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{act.activity_time.slice(0, 5)}</span>
-                  </div>
-                  <div style={{ width: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                    <div style={{ width: 16, height: 16, borderRadius: '50%', background: color, border: '2px solid #0f172a', marginTop: 16, flexShrink: 0 }} />
-                    {timeDiff && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4, whiteSpace: 'nowrap' }}>{timeDiff}</span>}
-                  </div>
-                  <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}33`, borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <span style={{ background: color + '22', color, borderRadius: 4, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{act.activity_type}</span>
-                        {act.company && <span style={{ marginLeft: 8, fontSize: 14, fontWeight: 600 }}>{act.company}</span>}
-                        {act.contact && <span style={{ marginLeft: 6, fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>({act.contact})</span>}
-                      </div>
-                      <button onClick={() => handleDelete(act.id)} style={{ background: deleteTarget === act.id ? '#ef4444' : 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '3px 8px', color: '#fff', cursor: 'pointer', fontSize: 11 }}>
-                        {deleteTarget === act.id ? '확인' : '삭제'}
-                      </button>
-                    </div>
-                    {act.content && <p style={{ marginTop: 8, fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>{act.content}</p>}
-                    {act.result && <p style={{ marginTop: 4, fontSize: 12, color: '#81c784' }}>→ {act.result}</p>}
-                    {(act.lat && act.lng) && <p style={{ marginTop: 4, fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>📍 {act.lat.toFixed(4)}, {act.lng.toFixed(4)}</p>}
+
+          {!log?.is_working && (
+            <div style={{ textAlign: 'center', padding: '40px 0', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 16 }}>
+              <p style={{ fontSize: 32 }}>🏖️</p>
+              <p style={{ color: '#dc2626', fontWeight: 600, marginTop: 8 }}>휴무일</p>
+              <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>연차/공휴일로 설정되었습니다</p>
+              <button onClick={handleToggleWorking} style={{ marginTop: 12, background: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, padding: '8px 20px', color: '#15803d', cursor: 'pointer', fontSize: 13 }}>근무로 변경</button>
+            </div>
+          )}
+
+          {log?.is_working && sorted.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
+              <p style={{ fontSize: 40 }}>📋</p>
+              <p style={{ marginTop: 8 }}>오늘의 활동을 기록하세요</p>
+            </div>
+          )}
+
+          {log?.is_working && sorted.map((act) => {
+            const style = TYPE_STYLE[act.activity_type] || TYPE_STYLE['기타']
+            return (
+              <div key={act.id} style={{ ...card, display: 'flex', gap: 16 }}>
+                <div style={{ flexShrink: 0 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: style.bg, color: style.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}>
+                    {style.icon}
                   </div>
                 </div>
-              )
-            })}
-          </div>
-        )}
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>
+                        {act.activity_time}{act.end_time ? ` ~ ${act.end_time}` : ''}
+                      </span>
+                      <span style={{ background: style.bg, color: style.text, borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 600 }}>{act.activity_type}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => openEdit(act)} style={{ padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: 16 }}>✏️</button>
+                      <button onClick={() => handleDelete(act.id)} style={{ padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: 16 }}>🗑️</button>
+                    </div>
+                  </div>
 
-        {log?.summary && (
-          <div style={{ marginTop: 24, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 12, padding: 16 }}>
-            <h3 style={{ fontSize: 14, color: '#f59e0b', marginBottom: 8 }}>📝 저장된 요약</h3>
-            <pre style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{log.summary}</pre>
-          </div>
-        )}
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{act.company || '-'}</div>
+                    {act.address && <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>📍 {act.address}</div>}
+                    {act.contact && <div style={{ fontSize: 12, color: '#64748b' }}>👤 {act.contact}</div>}
+                  </div>
+
+                  {act.content && (
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#334155', lineHeight: 1.5, marginBottom: 8 }}>
+                      {act.content}
+                    </div>
+                  )}
+                  {act.result && <div style={{ fontSize: 12, color: '#059669', marginBottom: 4 }}>✅ 결과: {act.result}</div>}
+                  {act.next_action && (
+                    <div style={{ background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: '#4338ca', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      ➡️ <b>다음 액션:</b> {act.next_action}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </main>
+
+      {/* Modal */}
+      {showModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', width: '100%', maxWidth: 520, overflow: 'hidden' }}>
+            <div style={{ background: '#4f46e5', color: '#fff', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 700, fontSize: 16 }}>➕ {editTarget ? '활동 수정' : '영업 활동 등록'}</span>
+              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>✕</button>
+            </div>
+            <form onSubmit={handleSave} style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <label style={lbl}>시작 시간 *<input type="time" required value={form.activity_time} onChange={e => setForm(p => ({ ...p, activity_time: e.target.value }))} style={inp} /></label>
+              <label style={lbl}>종료 시간<input type="time" value={form.end_time} onChange={e => setForm(p => ({ ...p, end_time: e.target.value }))} style={inp} /></label>
+              <label style={lbl}>활동 구분 *
+                <select value={form.activity_type} onChange={e => setForm(p => ({ ...p, activity_type: e.target.value }))} style={inp}>
+                  {ACTIVITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+              <label style={lbl}>거래처/장소<input type="text" value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))} style={inp} placeholder="회사명 또는 장소" /></label>
+              <label style={{ ...lbl, gridColumn: '1/-1' }}>주소<input type="text" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} style={inp} placeholder="서울시 강남구 테헤란로..." /></label>
+              <label style={lbl}>담당자<input type="text" value={form.contact} onChange={e => setForm(p => ({ ...p, contact: e.target.value }))} style={inp} placeholder="담당자명" /></label>
+              <label style={lbl}>결과<input type="text" value={form.result} onChange={e => setForm(p => ({ ...p, result: e.target.value }))} style={inp} placeholder="계약/검토중 등" /></label>
+              <label style={{ ...lbl, gridColumn: '1/-1' }}>활동 내용<textarea value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))} style={{ ...inp, height: 80, resize: 'vertical' }} placeholder="활동 내용 입력..." /></label>
+              <label style={{ ...lbl, gridColumn: '1/-1' }}>다음 액션<input type="text" value={form.next_action} onChange={e => setForm(p => ({ ...p, next_action: e.target.value }))} style={inp} placeholder="다음 할 일 또는 후속조치" /></label>
+              <div style={{ gridColumn: '1/-1', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowModal(false)} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 20px', color: '#475569', cursor: 'pointer' }}>취소</button>
+                <button type="submit" style={{ background: '#4f46e5', border: 'none', borderRadius: 8, padding: '10px 24px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>저장</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-const lblStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: 'rgba(255,255,255,0.6)' }
-const inpStyle: React.CSSProperties = { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#fff', fontSize: 14, outline: 'none' }
+const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
+function statBox(bg: string, accent: string, dark: string): React.CSSProperties { return { background: bg, padding: 12, borderRadius: 10, border: `1px solid ${bg === '#f8fafc' ? '#e2e8f0' : bg}` } }
+function headerBtn(bg: string): React.CSSProperties { return { background: bg, border: 'none', borderRadius: 8, padding: '6px 12px', color: '#fff', fontSize: 12, fontWeight: 500, cursor: 'pointer' } }
+const lbl: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, fontWeight: 600, color: '#475569' }
+const inp: React.CSSProperties = { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', color: '#1e293b', fontSize: 14, outline: 'none', marginTop: 2 }

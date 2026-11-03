@@ -30,11 +30,14 @@ export interface Activity {
   log_id: string
   user_id: string
   activity_time: string
+  end_time: string | null
   activity_type: string
   company: string | null
   contact: string | null
+  address: string | null
   content: string | null
   result: string | null
+  next_action: string | null
   lat: number | null
   lng: number | null
   created_at: string
