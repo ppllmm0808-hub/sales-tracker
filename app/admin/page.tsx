@@ -28,6 +28,201 @@ type MemberData = {
   color: string
 }
 
+const TYPE_COLORS: Record<string, string> = {
+  '방문': '#4f46e5', '미팅': '#7c3aed', '계약': '#059669', '전화': '#0284c7',
+  '이메일': '#be185d', '제안': '#d97706', '내근': '#475569', '이동': '#b45309',
+  '식사': '#065f46', '기타': '#94a3b8',
+}
+
+function ReportView({ data, year, month }: { data: any[], year: number, month: number }) {
+  const barRef = useRef<HTMLCanvasElement>(null)
+  const donutRef = useRef<HTMLCanvasElement>(null)
+  const lineRef = useRef<HTMLCanvasElement>(null)
+  const charts = useRef<any[]>([])
+
+  useEffect(() => {
+    const initCharts = () => {
+      const Chart = (window as any).Chart
+      charts.current.forEach(c => c?.destroy())
+      charts.current = []
+      if (!barRef.current || !donutRef.current || !lineRef.current) return
+
+      // --- 담당자별 활동건수 (Bar) ---
+      const personMap: Record<string, { name: string; count: number; contract: number }> = {}
+      for (const log of data) {
+        const key = log.user_id
+        const name = log.profiles?.name || log.profiles?.email || '미확인'
+        if (!personMap[key]) personMap[key] = { name, count: 0, contract: 0 }
+        personMap[key].count += log.activities.length
+        personMap[key].contract += log.activities.filter((a: any) => a.activity_type === '계약').length
+      }
+      const persons = Object.values(personMap)
+      charts.current.push(new Chart(barRef.current, {
+        type: 'bar',
+        data: {
+          labels: persons.map(p => p.name),
+          datasets: [
+            { label: '총 활동', data: persons.map(p => p.count), backgroundColor: '#4f46e5', borderRadius: 6 },
+            { label: '계약', data: persons.map(p => p.contract), backgroundColor: '#059669', borderRadius: 6 },
+          ],
+        },
+        options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } },
+      }))
+
+      // --- 활동 유형 분포 (Donut) ---
+      const typeMap: Record<string, number> = {}
+      for (const log of data) {
+        for (const act of log.activities) {
+          typeMap[act.activity_type] = (typeMap[act.activity_type] || 0) + 1
+        }
+      }
+      const typeEntries = Object.entries(typeMap).sort((a, b) => b[1] - a[1])
+      charts.current.push(new Chart(donutRef.current, {
+        type: 'doughnut',
+        data: {
+          labels: typeEntries.map(([t]) => `${TYPE_STYLE[t]?.icon || ''} ${t}`),
+          datasets: [{ data: typeEntries.map(([, v]) => v), backgroundColor: typeEntries.map(([t]) => TYPE_COLORS[t] || '#94a3b8'), borderWidth: 2 }],
+        },
+        options: { responsive: true, plugins: { legend: { position: 'right' } }, cutout: '60%' },
+      }))
+
+      // --- 일별 활동 추이 (Line) ---
+      const daysInMonth = new Date(year, month, 0).getDate()
+      const dayLabels = Array.from({ length: daysInMonth }, (_, i) => `${i + 1}일`)
+      const dayMap: Record<string, number> = {}
+      for (const log of data) {
+        const day = parseInt(log.log_date.split('-')[2], 10)
+        dayMap[day] = (dayMap[day] || 0) + log.activities.length
+      }
+      const dayData = Array.from({ length: daysInMonth }, (_, i) => dayMap[i + 1] || 0)
+      charts.current.push(new Chart(lineRef.current, {
+        type: 'line',
+        data: {
+          labels: dayLabels,
+          datasets: [{ label: '일별 활동 건수', data: dayData, borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,0.08)', fill: true, tension: 0.3, pointRadius: 4, pointHoverRadius: 6 }],
+        },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } },
+      }))
+    }
+
+    if ((window as any).Chart) { initCharts(); return }
+    if (!document.getElementById('chartjs')) {
+      const s = document.createElement('script')
+      s.id = 'chartjs'; s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'
+      s.onload = initCharts; document.head.appendChild(s)
+    } else {
+      const t = setInterval(() => { if ((window as any).Chart) { clearInterval(t); initCharts() } }, 100)
+    }
+    return () => { charts.current.forEach(c => c?.destroy()); charts.current = [] }
+  }, [data, year, month])
+
+  // --- 요약 통계 계산 ---
+  const personSummary: Record<string, { name: string; attendDays: number; total: number; visitMeet: number; callEmail: number; contract: number }> = {}
+  for (const log of data) {
+    const key = log.user_id
+    const name = log.profiles?.name || log.profiles?.email || '미확인'
+    if (!personSummary[key]) personSummary[key] = { name, attendDays: 0, total: 0, visitMeet: 0, callEmail: 0, contract: 0 }
+    if (log.check_in_time) personSummary[key].attendDays++
+    personSummary[key].total += log.activities.length
+    personSummary[key].visitMeet += log.activities.filter((a: any) => ['방문', '미팅'].includes(a.activity_type)).length
+    personSummary[key].callEmail += log.activities.filter((a: any) => ['전화', '이메일'].includes(a.activity_type)).length
+    personSummary[key].contract += log.activities.filter((a: any) => a.activity_type === '계약').length
+  }
+  const rows = Object.values(personSummary)
+  const totals = rows.reduce((acc, r) => ({ attendDays: acc.attendDays + r.attendDays, total: acc.total + r.total, visitMeet: acc.visitMeet + r.visitMeet, callEmail: acc.callEmail + r.callEmail, contract: acc.contract + r.contract }), { attendDays: 0, total: 0, visitMeet: 0, callEmail: 0, contract: 0 })
+
+  return (
+    <div id="report-content" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <style>{`@media print { body > * { display: none !important; } #report-print-root { display: block !important; } .no-print { display: none !important; } }`}</style>
+
+      {/* 리포트 헤더 */}
+      <div style={{ background: 'linear-gradient(135deg,#0f172a,#1e3a5f)', color: '#fff', borderRadius: 16, padding: '24px 28px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>영업팀 월간 보고서</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{year}년 {month}월 영업 활동 종합</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>출력일: {toDateStr(new Date())}</div>
+        </div>
+        <button className="no-print" onClick={() => window.print()}
+          style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 10, padding: '10px 20px', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+          🖨️ PDF로 저장
+        </button>
+      </div>
+
+      {/* 핵심 수치 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: '총 출근일수', value: totals.attendDays, unit: '일', color: '#4f46e5', bg: '#eef2ff' },
+          { label: '총 활동 건수', value: totals.total, unit: '건', color: '#0284c7', bg: '#f0f9ff' },
+          { label: '방문 · 미팅', value: totals.visitMeet, unit: '건', color: '#7c3aed', bg: '#f5f3ff' },
+          { label: '계약 성사', value: totals.contract, unit: '건', color: '#059669', bg: '#f0fdf4' },
+        ].map(s => (
+          <div key={s.label} style={{ background: s.bg, borderRadius: 14, padding: '18px 20px' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: s.color, marginBottom: 4 }}>{s.label}</div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: s.color }}>{s.value}<span style={{ fontSize: 16, marginLeft: 2 }}>{s.unit}</span></div>
+          </div>
+        ))}
+      </div>
+
+      {/* 차트 2열 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16, marginBottom: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 14 }}>👤 담당자별 활동 건수</div>
+          <canvas ref={barRef} />
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 14 }}>📊 활동 유형 분포</div>
+          <canvas ref={donutRef} />
+        </div>
+      </div>
+
+      {/* 일별 추이 */}
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 14 }}>📈 일별 활동 추이</div>
+        <canvas ref={lineRef} />
+      </div>
+
+      {/* 담당자별 요약 테이블 */}
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 14 }}>📋 담당자별 상세 현황</div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: '#f8fafc' }}>
+              {['담당자', '출근일수', '총 활동', '방문/미팅', '전화/이메일', '계약', '활동/일(평균)'].map(h => (
+                <th key={h} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#475569', borderBottom: '2px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.sort((a, b) => b.total - a.total).map((r, i) => (
+              <tr key={r.name} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a', borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: MEMBER_COLORS[i % MEMBER_COLORS.length], color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, marginRight: 8 }}>{r.name.charAt(0)}</span>
+                  {r.name}
+                </td>
+                {[r.attendDays, r.total, r.visitMeet, r.callEmail, r.contract].map((v, j) => (
+                  <td key={j} style={{ padding: '10px 12px', textAlign: 'center', color: v === 0 ? '#cbd5e1' : '#1e293b', fontWeight: v > 0 ? 600 : 400, borderBottom: '1px solid #f1f5f9' }}>{v}</td>
+                ))}
+                <td style={{ padding: '10px 12px', textAlign: 'center', color: '#4f46e5', fontWeight: 700, borderBottom: '1px solid #f1f5f9' }}>
+                  {r.attendDays > 0 ? (r.total / r.attendDays).toFixed(1) : '-'}
+                </td>
+              </tr>
+            ))}
+            <tr style={{ background: '#f0f9ff', fontWeight: 700 }}>
+              <td style={{ padding: '10px 12px', color: '#0284c7', fontWeight: 800 }}>합계</td>
+              {[totals.attendDays, totals.total, totals.visitMeet, totals.callEmail, totals.contract].map((v, j) => (
+                <td key={j} style={{ padding: '10px 12px', textAlign: 'center', color: '#0284c7' }}>{v}</td>
+              ))}
+              <td style={{ padding: '10px 12px', textAlign: 'center', color: '#0284c7' }}>
+                {totals.attendDays > 0 ? (totals.total / totals.attendDays).toFixed(1) : '-'}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function AdminMap({ members }: { members: MemberData[] }) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -131,7 +326,7 @@ export default function AdminPage() {
   const [members, setMembers] = useState<MemberData[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState<'list' | 'map' | 'users' | 'export'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'map' | 'users' | 'export' | 'report'>('list')
   const [users, setUsers] = useState<Profile[]>([])
   const [userForm, setUserForm] = useState({ email: '', password: '', name: '', role: 'member' })
   const [editUser, setEditUser] = useState<Profile | null>(null)
@@ -144,6 +339,10 @@ export default function AdminPage() {
   const [exportEnd, setExportEnd] = useState(toDateStr(new Date()))
   const [exporting, setExporting] = useState(false)
   const [exportMsg, setExportMsg] = useState('')
+  const [reportYear, setReportYear] = useState(new Date().getFullYear())
+  const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1)
+  const [reportData, setReportData] = useState<any[]>([])
+  const [reportLoading, setReportLoading] = useState(false)
 
   const loadData = useCallback(async (date: string) => {
     setLoading(true)
@@ -227,6 +426,17 @@ export default function AdminPage() {
     })
     setUserMsg('✅ 삭제됐습니다.')
     await loadUsers(token)
+  }
+
+  async function loadReport(y: number, m: number) {
+    setReportLoading(true)
+    const token = await getToken()
+    const start = `${y}-${String(m).padStart(2,'0')}-01`
+    const lastDay = new Date(y, m, 0).getDate()
+    const end = `${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`
+    const res = await fetch(`/api/admin/export?start=${start}&end=${end}`, { headers: { Authorization: `Bearer ${token}` } })
+    if (res.ok) setReportData(await res.json())
+    setReportLoading(false)
   }
 
   async function handleExport() {
@@ -324,10 +534,38 @@ export default function AdminPage() {
 
         {/* 탭 */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {([['list','👥 팀원 현황'],['map','🗺️ 이동 경로'],['users','⚙️ 계정 관리'],['export','📥 내보내기']] as const).map(([m, label]) => (
+          {([['list','👥 팀원 현황'],['map','🗺️ 이동 경로'],['report','📊 월간 리포트'],['users','⚙️ 계정 관리'],['export','📥 내보내기']] as const).map(([m, label]) => (
             <button key={m} onClick={() => { setViewMode(m); setUserMsg('') }} style={{ padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === m ? '#0f172a' : '#f1f5f9', color: viewMode === m ? '#fff' : '#64748b' }}>{label}</button>
           ))}
         </div>
+
+        {/* 월간 리포트 탭 */}
+        {viewMode === 'report' && (
+          <div>
+            <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '16px 20px' }}>
+              <select value={reportYear} onChange={e => setReportYear(Number(e.target.value))} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 14, color: '#1e293b' }}>
+                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}년</option>)}
+              </select>
+              <select value={reportMonth} onChange={e => setReportMonth(Number(e.target.value))} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 14, color: '#1e293b' }}>
+                {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}
+              </select>
+              <button onClick={() => loadReport(reportYear, reportMonth)} disabled={reportLoading}
+                style={{ background: '#0f172a', border: 'none', borderRadius: 8, padding: '8px 20px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                {reportLoading ? '조회 중...' : '조회'}
+              </button>
+              {reportData.length === 0 && !reportLoading && (
+                <span style={{ color: '#94a3b8', fontSize: 13 }}>월과 연도를 선택 후 조회하세요</span>
+              )}
+            </div>
+            {reportLoading ? (
+              <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>데이터 불러오는 중...</div>
+            ) : reportData.length > 0 ? (
+              <div id="report-print-root">
+                <ReportView data={reportData} year={reportYear} month={reportMonth} />
+              </div>
+            ) : null}
+          </div>
+        )}
 
         {/* 내보내기 탭 */}
         {viewMode === 'export' && (
@@ -466,14 +704,14 @@ export default function AdminPage() {
           </div>
         )}
 
-        {loading && viewMode !== 'users' && viewMode !== 'export' ? (
+        {loading && viewMode !== 'users' && viewMode !== 'export' && viewMode !== 'report' ? (
           <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>불러오는 중...</div>
-        ) : viewMode !== 'users' && viewMode !== 'export' && members.length === 0 ? (
+        ) : viewMode !== 'users' && viewMode !== 'export' && viewMode !== 'report' && members.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 60, background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', color: '#94a3b8' }}>
             <p style={{ fontSize: 36 }}>📋</p>
             <p style={{ marginTop: 8 }}>이 날짜에 등록된 활동이 없습니다</p>
           </div>
-        ) : viewMode === 'export' ? null : viewMode === 'map' ? (
+        ) : viewMode === 'export' || viewMode === 'report' ? null : viewMode === 'map' ? (
           <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 20 }}>
             <div style={{ marginBottom: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {members.map(m => (
