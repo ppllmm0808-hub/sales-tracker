@@ -28,19 +28,25 @@ export async function POST(req: NextRequest) {
   const admin = await verifyAdmin(req)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
-  const { email, password, name, role } = await req.json()
-  if (!email || !password) return NextResponse.json({ error: '이메일과 비밀번호를 입력하세요' }, { status: 400 })
+  const { email, name, role } = await req.json()
+  if (!email) return NextResponse.json({ error: '이메일을 입력하세요' }, { status: 400 })
 
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email, password, email_confirm: true,
+  // 이미 등록된 이메일 확인
+  const { data: existing } = await supabaseAdmin.from('profiles').select('id').eq('email', email).single()
+  if (existing) return NextResponse.json({ error: '이미 등록된 이메일입니다' }, { status: 400 })
+
+  // 초대 이메일 발송 (본인이 비밀번호 직접 설정)
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+    data: { name, role: role || 'member' },
   })
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
 
+  // 프로필 미리 생성
   await supabaseAdmin.from('profiles').insert({
     id: authData.user.id, email, name: name || null, role: role || 'member',
   })
 
-  return NextResponse.json({ success: true, id: authData.user.id })
+  return NextResponse.json({ success: true })
 }
 
 export async function PATCH(req: NextRequest) {

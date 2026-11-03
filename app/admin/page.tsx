@@ -286,7 +286,6 @@ export default function AdminPage() {
                 {[
                   { label: '이름', key: 'name', type: 'text', placeholder: '홍길동' },
                   { label: '이메일 *', key: 'email', type: 'email', placeholder: 'user@company.com' },
-                  { label: '비밀번호 *', key: 'password', type: 'password', placeholder: '8자 이상' },
                 ].map(f => (
                   <label key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#475569' }}>
                     {f.label}
@@ -305,14 +304,16 @@ export default function AdminPage() {
                 </label>
                 {userMsg && <p style={{ fontSize: 13, color: userMsg.startsWith('✅') ? '#059669' : '#dc2626' }}>{userMsg}</p>}
                 <button type="submit" disabled={userLoading} style={{ background: '#0f172a', border: 'none', borderRadius: 10, padding: '11px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', marginTop: 4 }}>
-                  {userLoading ? '처리 중...' : '계정 생성'}
+                  {userLoading ? '처리 중...' : '📧 초대 메일 발송'}
                 </button>
               </form>
-              <div style={{ marginTop: 20, padding: 14, background: '#f8fafc', borderRadius: 10, fontSize: 12, color: '#64748b', lineHeight: 1.7 }}>
-                <b style={{ color: '#334155' }}>로그인 방법</b><br />
-                생성된 계정으로 <b>sales-tracker-5a2h.vercel.app</b> 에서<br />
-                이메일 + 비밀번호로 바로 로그인 가능합니다.<br />
-                별도 회원가입 불필요.
+              <div style={{ marginTop: 20, padding: 14, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, fontSize: 12, color: '#065f46', lineHeight: 1.8 }}>
+                <b>초대 방식 안내</b><br />
+                1. 관리자가 이름+이메일 입력 후 초대 발송<br />
+                2. 담당자 이메일로 초대 링크 도착<br />
+                3. 링크 클릭 → <b>본인이 직접 비밀번호 설정</b><br />
+                4. 이후 이메일+비밀번호로 로그인<br />
+                <span style={{ color: '#94a3b8', fontSize: 11 }}>초대받지 않은 사람은 접근 불가</span>
               </div>
             </div>
 
@@ -326,7 +327,6 @@ export default function AdminPage() {
                       <form onSubmit={handleUpdateUser} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                           <input placeholder="이름" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} style={iStyle} />
-                          <input type="password" placeholder="새 비밀번호 (변경시만)" value={editForm.password} onChange={e => setEditForm(p => ({ ...p, password: e.target.value }))} style={iStyle} />
                         </div>
                         <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))} style={iStyle}>
                           <option value="member">담당자</option>
