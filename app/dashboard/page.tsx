@@ -214,40 +214,45 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // 자정 자동 날짜 전환 + 전날 일지 마무리
+  // 자정 자동 날짜 전환 + 전날 일지 마무리 (화면 복귀 시에도 체크)
   useEffect(() => {
     if (!profile) return
-    let midnightTimeout: ReturnType<typeof setTimeout>
-    let dailyInterval: ReturnType<typeof setInterval>
 
+    async function checkAndRollover() {
+      const today = toDateStr(new Date())
+      const currentDate = toDateStr(new Date()) // 항상 최신 날짜
+      // selectedDate가 오늘과 다르면 전환
+      setSelectedDate(prev => {
+        if (prev !== today) {
+          // 전날 일지 마무리
+          const prevLog = logRef.current
+          if (prevLog?.is_working) {
+            updateLogWorking(prevLog.id, false)
+            setLog(l => l ? { ...l, is_working: false } : l)
+          }
+          load(profile.id, today)
+          return today
+        }
+        return prev
+      })
+    }
+
+    // 앱이 포그라운드로 돌아올 때 날짜 체크 (모바일 슬립 대응)
+    const onVisible = () => { if (document.visibilityState === 'visible') checkAndRollover() }
+    document.addEventListener('visibilitychange', onVisible)
+
+    // 자정 타이머 (앱이 계속 열려있을 때)
     function msUntilMidnight() {
       const now = new Date()
       const midnight = new Date(now)
       midnight.setHours(24, 0, 0, 0)
       return midnight.getTime() - now.getTime()
     }
-
-    async function handleMidnight() {
-      // 전날 일지가 근무중이면 자동 마무리
-      const prevLog = logRef.current
-      if (prevLog?.is_working) {
-        await updateLogWorking(prevLog.id, false)
-        setLog(prev => prev ? { ...prev, is_working: false } : prev)
-      }
-      // 오늘 날짜로 전환
-      const today = toDateStr(new Date())
-      setSelectedDate(today)
-      await load(profile.id, today)
-    }
-
-    midnightTimeout = setTimeout(() => {
-      handleMidnight()
-      dailyInterval = setInterval(handleMidnight, 24 * 60 * 60 * 1000)
-    }, msUntilMidnight())
+    const midnightTimeout = setTimeout(() => checkAndRollover(), msUntilMidnight())
 
     return () => {
+      document.removeEventListener('visibilitychange', onVisible)
       clearTimeout(midnightTimeout)
-      clearInterval(dailyInterval)
     }
   }, [profile?.id, load])
 
