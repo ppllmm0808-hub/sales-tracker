@@ -226,6 +226,22 @@ export default function Dashboard() {
     setTimerStart(time)
     setElapsed(0)
     timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
+    // GPS 자동 캡처 (백그라운드)
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords
+        setFormCoords({ lat, lng })
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ko`, { headers: { 'User-Agent': 'SalesTracker/1.0' } })
+          const data = await res.json()
+          if (data?.address) {
+            const a = data.address
+            const addr = [a.road, a.quarter || a.suburb, a.city_district || a.borough].filter(Boolean).join(' ') || data.display_name.split(',').slice(0,3).join(',').trim()
+            setForm(p => ({ ...p, address: addr }))
+          }
+        } catch {}
+      }, () => {}, { enableHighAccuracy: true, timeout: 8000 })
+    }
   }
 
   function stopTimer() {
@@ -519,7 +535,10 @@ export default function Dashboard() {
           {/* Timer / Add Button */}
           {timerStart ? (
             <div style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', borderRadius: 16, padding: 20, color: '#fff', textAlign: 'center' }}>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>🔴 활동 진행 중 — {timerStart} 시작</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
+                🔴 활동 진행 중 — {timerStart} 시작
+                {formCoords && <span style={{ marginLeft: 8, color: '#86efac' }}>📍 GPS 확인</span>}
+              </div>
               <div style={{ fontSize: 36, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: 2, marginBottom: 16 }}>
                 {String(Math.floor(elapsed / 3600)).padStart(2,'0')}:{String(Math.floor((elapsed % 3600) / 60)).padStart(2,'0')}:{String(elapsed % 60).padStart(2,'0')}
               </div>
