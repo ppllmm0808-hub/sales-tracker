@@ -14,9 +14,15 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError('이메일 또는 비밀번호가 틀렸습니다.'); setLoading(false); return }
-    router.push('/dashboard')
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) { setError('이메일 또는 비밀번호가 틀렸습니다.'); return }
+      router.push('/dashboard')
+    } catch {
+      setError('네트워크 오류가 발생했습니다. 다시 시도해주세요.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
