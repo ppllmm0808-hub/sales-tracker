@@ -322,37 +322,56 @@ export default function ClaimDetailPage() {
 
         {/* 사진 */}
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>📷 현장 사진 {claim.photos?.length > 0 && <span style={{ color: '#94a3b8', fontSize: 13, fontWeight: 400 }}>({claim.photos.length}장)</span>}</div>
-            {canEdit && (
-              <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
-                style={{ background: uploading ? '#f1f5f9' : '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '6px 14px', color: uploading ? '#94a3b8' : '#1d4ed8', fontSize: 12, fontWeight: 700, cursor: uploading ? 'default' : 'pointer' }}>
-                {uploading ? '업로드 중...' : '📷 사진 추가'}
-              </button>
-            )}
-            <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoUpload} />
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 14 }}>
+            📷 현장 사진
+            {claim.photos?.length > 0 && <span style={{ color: '#94a3b8', fontSize: 13, fontWeight: 400 }}> ({claim.photos.length}장)</span>}
           </div>
 
-          {claim.photos?.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+          {/* 사진 그리드 */}
+          {claim.photos?.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
               {claim.photos.map((url, i) => (
                 <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', background: '#f1f5f9' }}>
                   <img src={url} alt={`사진 ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
                     onClick={() => setLightbox(url)} />
                   {canEdit && (
                     <button onClick={() => handleDeletePhoto(url)}
-                      style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: 22, height: 22, color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: 24, height: 24, color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
                       ✕
                     </button>
                   )}
                 </div>
               ))}
             </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '30px 0', color: '#94a3b8', fontSize: 13 }}>
-              <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
-              {canEdit ? '위 버튼으로 현장 사진을 추가하세요' : '등록된 사진이 없습니다'}
-            </div>
+          )}
+
+          {/* 업로드 영역 */}
+          {canEdit && (
+            <>
+              <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoUpload} />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                style={{
+                  width: '100%', border: '2px dashed #bfdbfe', borderRadius: 12,
+                  padding: '24px 16px', background: uploading ? '#f8fafc' : '#eff6ff',
+                  cursor: uploading ? 'default' : 'pointer', display: 'flex',
+                  flexDirection: 'column', alignItems: 'center', gap: 8,
+                  transition: 'background 0.15s',
+                }}>
+                <span style={{ fontSize: 36 }}>{uploading ? '⏳' : '📷'}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: uploading ? '#94a3b8' : '#1d4ed8' }}>
+                  {uploading ? '사진 업로드 중...' : '사진 추가하기'}
+                </span>
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                  {uploading ? '잠시 기다려 주세요' : '갤러리에서 선택 또는 카메라 촬영 · 여러 장 동시 선택 가능'}
+                </span>
+              </button>
+            </>
+          )}
+
+          {!canEdit && claim.photos?.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '20px 0', color: '#94a3b8', fontSize: 13 }}>등록된 사진이 없습니다</div>
           )}
         </div>
 

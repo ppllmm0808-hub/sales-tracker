@@ -212,11 +212,11 @@ export default function ClaimsPage() {
                     </div>
 
                     {/* 사진 수 + 화살표 */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                       {claim.photos?.length > 0 && (
                         <span style={{ fontSize: 11, color: '#94a3b8' }}>📷{claim.photos.length}</span>
                       )}
-                      <span style={{ color: '#cbd5e1', fontSize: 18 }}>›</span>
+                      <span style={{ color: '#94a3b8', fontSize: 22, fontWeight: 300 }}>›</span>
                     </div>
                   </div>
                 )
