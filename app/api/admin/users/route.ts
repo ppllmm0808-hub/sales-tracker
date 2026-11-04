@@ -20,9 +20,12 @@ export async function GET(req: NextRequest) {
   const admin = await verifyAdmin(req)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
-  // owner 계정은 항상 목록에서 숨김
-  const { data: profiles } = await supabaseAdmin
-    .from('profiles').select('*').neq('role', 'owner').order('created_at')
+  // owner는 항상 숨김. admin-role 호출자는 admin도 숨김 (member만 조회)
+  let query = supabaseAdmin.from('profiles').select('*').neq('role', 'owner').order('created_at')
+  if ((admin as any).role === 'admin') {
+    query = query.neq('role', 'admin')
+  }
+  const { data: profiles } = await query
   return NextResponse.json(profiles ?? [])
 }
 
