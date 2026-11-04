@@ -178,9 +178,9 @@ export default function ClaimsPage() {
             <div style={{ fontSize: 13, marginTop: 4 }}>위 버튼으로 클레임을 등록하세요</div>
           </div>
         ) : sortedDates.map(date => (
-          <div key={date} style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 6, paddingLeft: 4 }}>
-              {date.replace(/-/g, '.')}
+          <div key={date} style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 8, borderLeft: '3px solid #dc2626', paddingLeft: 10 }}>
+              {date.replace(/-/g, '.')} · {grouped[date].length}건
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {grouped[date].map(claim => {
@@ -196,8 +196,7 @@ export default function ClaimsPage() {
                     {/* 왼쪽: 날짜 + 업체명 + 내용 */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 3 }}>
-                        {claim.claim_date.replace(/-/g, '.')}
-                        {claim.category && <span style={{ background: cs.bg, color: cs.text, borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, marginLeft: 6 }}>{claim.category}</span>}
+                        {claim.category && <span style={{ background: cs.bg, color: cs.text, borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>{claim.category}</span>}
                         {isAdmin && claim.profiles && <span style={{ marginLeft: 6 }}>{claim.profiles.name || claim.profiles.email}</span>}
                       </div>
                       <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{claim.company}</div>
