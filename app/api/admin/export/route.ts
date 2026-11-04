@@ -25,13 +25,16 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end')
   if (!start || !end) return NextResponse.json({ error: '기간을 입력하세요' }, { status: 400 })
 
-  const { data: logs } = await supabaseAdmin
+  const { data: rawLogs } = await supabaseAdmin
     .from('sales_logs')
     .select('*, profiles(name, email, role)')
     .gte('log_date', start)
     .lte('log_date', end)
     .order('log_date')
     .order('user_id')
+
+  // 관리자/owner 본인 데이터 제외, 담당자(member)만 포함
+  const logs = (rawLogs || []).filter(l => (l.profiles as any)?.role === 'member')
 
   if (!logs || logs.length === 0) return NextResponse.json([])
 
