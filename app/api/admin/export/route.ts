@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end')
   if (!start || !end) return NextResponse.json({ error: '기간을 입력하세요' }, { status: 400 })
 
-  const { data: rawLogs } = await supabaseAdmin
+  const { data: rawLogs } = await getSupabaseAdmin()
     .from('sales_logs')
     .select('*, profiles(name, email, role)')
     .gte('log_date', start)
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   if (!logs || logs.length === 0) return NextResponse.json([])
 
   const logIds = logs.map(l => l.id)
-  const { data: activities } = await supabaseAdmin
+  const { data: activities } = await getSupabaseAdmin()
     .from('activities')
     .select('*')
     .in('log_id', logIds)

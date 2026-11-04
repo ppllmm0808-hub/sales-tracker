@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   const date = new URL(req.url).searchParams.get('date')
   if (!date) return NextResponse.json({ error: '날짜를 입력하세요' }, { status: 400 })
 
-  const { data: logs } = await supabaseAdmin
+  const { data: logs } = await getSupabaseAdmin()
     .from('sales_logs')
     .select('*, profiles(name, email, role)')
     .eq('log_date', date)
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   if (!logs || logs.length === 0) return NextResponse.json([])
 
   const logIds = logs.map(l => l.id)
-  const { data: activities } = await supabaseAdmin
+  const { data: activities } = await getSupabaseAdmin()
     .from('activities')
     .select('*')
     .in('log_id', logIds)

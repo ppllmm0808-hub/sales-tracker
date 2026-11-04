@@ -21,14 +21,14 @@ export async function POST(req: NextRequest) {
   }
 
   // 이미 owner인지 확인
-  const { data: existing } = await supabaseAdmin
+  const { data: existing } = await getSupabaseAdmin()
     .from('profiles').select('role').eq('email', OWNER_EMAIL).single()
   if (existing?.role === 'owner') {
     return NextResponse.json({ success: true, message: '이미 프로그램 관리자로 설정되어 있습니다' })
   }
 
   // role = owner 업데이트 시도
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from('profiles').update({ role: 'owner' }).eq('email', OWNER_EMAIL)
 
   if (error) {
