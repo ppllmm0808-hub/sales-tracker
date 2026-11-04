@@ -331,12 +331,11 @@ export default function AdminPage() {
   const [viewMode, setViewMode] = useState<'list' | 'map' | 'users' | 'export' | 'report'>('list')
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
   const [users, setUsers] = useState<Profile[]>([])
-  const [userForm, setUserForm] = useState({ email: '', password: '', name: '', role: 'member' })
+  const [userForm, setUserForm] = useState({ email: '', name: '', role: 'member' })
   const [editUser, setEditUser] = useState<Profile | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', role: 'member', password: '' })
+  const [editForm, setEditForm] = useState({ name: '', role: 'member' })
   const [userLoading, setUserLoading] = useState(false)
   const [userMsg, setUserMsg] = useState('')
-  const [inviteLink, setInviteLink] = useState('')
   const [linkCopied, setLinkCopied] = useState(false)
   const [exportStart, setExportStart] = useState(() => {
     const d = new Date(); d.setDate(1); return toDateStr(d)
@@ -422,29 +421,9 @@ export default function AdminPage() {
     })
     const data = await res.json()
     if (res.ok) {
-      setUserMsg('✅ 계정이 생성됐습니다.')
-      setUserForm({ email: '', password: '', name: '', role: 'member' })
+      setUserMsg('✅ 등록됐습니다. 이제 구글로 로그인하면 됩니다.')
+      setUserForm({ email: '', name: '', role: 'member' })
       await loadUsers(token)
-    } else {
-      setUserMsg(`❌ ${data.error}`)
-    }
-    setUserLoading(false)
-  }
-
-  async function handleCreateLink() {
-    if (!userForm.email) { setUserMsg('❌ 이메일을 입력하세요'); return }
-    setUserLoading(true); setUserMsg('')
-    const token = await getToken()
-    const res = await fetch('/api/admin/users', {
-      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...userForm, linkOnly: true }),
-    })
-    const data = await res.json()
-    if (res.ok && data.inviteLink) {
-      setInviteLink(data.inviteLink)
-      setUserForm({ email: '', password: '', name: '', role: 'member' })
-      await loadUsers(token)
-      setUserMsg('✅ 링크 생성 완료! 아래 링크를 카톡으로 전달하세요.')
     } else {
       setUserMsg(`❌ ${data.error}`)
     }
@@ -667,11 +646,14 @@ export default function AdminPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 20 }}>
             {/* 계정 생성 */}
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 24 }}>
-              <h3 style={{ fontWeight: 700, fontSize: 16, color: '#0f172a', marginBottom: 16 }}>➕ 새 계정 등록</h3>
+              <h3 style={{ fontWeight: 700, fontSize: 16, color: '#0f172a', marginBottom: 4 }}>➕ 새 계정 등록</h3>
+              <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16, lineHeight: 1.6 }}>
+                이메일을 등록하면 해당 구글 계정으로 로그인 가능합니다
+              </p>
               <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {[
                   { label: '이름', key: 'name', type: 'text', placeholder: '홍길동' },
-                  { label: '이메일 *', key: 'email', type: 'email', placeholder: 'user@company.com' },
+                  { label: '이메일 (구글 계정) *', key: 'email', type: 'email', placeholder: 'user@gmail.com' },
                 ].map(f => (
                   <label key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#475569' }}>
                     {f.label}
@@ -690,26 +672,15 @@ export default function AdminPage() {
                   </select>
                 </label>
                 {userMsg && <p style={{ fontSize: 13, color: userMsg.startsWith('✅') ? '#059669' : '#dc2626' }}>{userMsg}</p>}
-                <button type="button" onClick={handleCreateLink} disabled={userLoading} style={{ background: '#f59e0b', border: 'none', borderRadius: 10, padding: '12px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-                  {userLoading ? '처리 중...' : '🔗 카톡 초대 링크 생성'}
+                <button type="submit" disabled={userLoading} style={{ background: '#4f46e5', border: 'none', borderRadius: 10, padding: '12px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                  {userLoading ? '처리 중...' : '✅ 계정 등록'}
                 </button>
               </form>
-              {inviteLink && (
-                <div style={{ marginTop: 12, padding: 14, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 8 }}>📲 아래 링크를 카톡으로 전달하세요 (24시간 유효)</div>
-                  <div style={{ fontSize: 11, color: '#78350f', background: '#fff', border: '1px solid #fcd34d', borderRadius: 8, padding: '8px 10px', wordBreak: 'break-all', marginBottom: 8 }}>
-                    {inviteLink}
-                  </div>
-                  <button onClick={() => { navigator.clipboard.writeText(inviteLink); setUserMsg('✅ 링크 복사됨! 카톡에 붙여넣기 하세요.'); }} style={{ background: '#f59e0b', border: 'none', borderRadius: 8, padding: '8px 16px', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', width: '100%' }}>
-                    📋 링크 복사
-                  </button>
-                </div>
-              )}
               {/* 앱 주소 공유 */}
               <div style={{ marginTop: 16, padding: 16, background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 12 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 8 }}>📲 앱 주소 카톡으로 공유</div>
                 <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 10, lineHeight: 1.7 }}>
-                  비밀번호 설정 완료 후 아래 주소로 접속
+                  등록 완료 후 아래 주소를 카톡으로 전달 → 구글 로그인
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <div style={{ flex: 1, background: '#fff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -768,7 +739,7 @@ export default function AdminPage() {
                           <div style={{ fontSize: 12, color: '#64748b', marginTop: 1 }}>{u.email}</div>
                         </div>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={() => { setEditUser(u); setEditForm({ name: u.name || '', role: u.role, password: '' }); setUserMsg('') }}
+                          <button onClick={() => { setEditUser(u); setEditForm({ name: u.name || '', role: u.role }); setUserMsg('') }}
                             style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: '#475569' }}>수정</button>
                           <button onClick={() => handleDeleteUser(u.id, u.name || u.email)}
                             style={{ background: '#fee2e2', border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: '#dc2626' }}>삭제</button>
@@ -794,7 +765,7 @@ export default function AdminPage() {
             <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap' }}>담당자 선택</span>
               <select
-                value={selectedMemberIds.size === 0 ? '__all__' : [...selectedMemberIds][0]}
+                value={selectedMemberIds.size === 0 ? '__all__' : Array.from(selectedMemberIds)[0]}
                 onChange={e => {
                   const v = e.target.value
                   setSelectedMemberIds(v === '__all__' ? new Set() : new Set([v]))
