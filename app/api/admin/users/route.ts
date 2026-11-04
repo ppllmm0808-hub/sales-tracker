@@ -38,26 +38,36 @@ export async function POST(req: NextRequest) {
 
   // 이미 등록된 이메일 확인
   const { data: existing } = await supabaseAdmin.from('profiles').select('id').eq('email', email).single()
-  if (existing) return NextResponse.json({ error: '이미 등록된 이메일입니다' }, { status: 400 })
 
   if (linkOnly) {
-    // 이메일 발송 없이 초대 링크만 생성
     const origin = req.headers.get('origin') || 'https://sales-tracker-5a2h.vercel.app'
-    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'invite',
-      email,
-      options: {
-        data: { name, role: role || 'member' },
-        redirectTo: `${origin}/reset-password`,
-      },
-    })
-    if (linkError) return NextResponse.json({ error: linkError.message }, { status: 400 })
+    const redirectTo = `${origin}/reset-password`
 
-    await supabaseAdmin.from('profiles').upsert({
-      id: linkData.user.id, email, name: name || null, role: role || 'member',
-    })
-    return NextResponse.json({ success: true, inviteLink: linkData.properties.action_link })
+    if (existing) {
+      // 기존 유저 → 비밀번호 재설정 링크
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email,
+        options: { redirectTo },
+      })
+      if (linkError) return NextResponse.json({ error: linkError.message }, { status: 400 })
+      return NextResponse.json({ success: true, inviteLink: linkData.properties.action_link })
+    } else {
+      // 신규 유저 → 초대 링크
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'invite',
+        email,
+        options: { data: { name, role: role || 'member' }, redirectTo },
+      })
+      if (linkError) return NextResponse.json({ error: linkError.message }, { status: 400 })
+      await supabaseAdmin.from('profiles').upsert({
+        id: linkData.user.id, email, name: name || null, role: role || 'member',
+      })
+      return NextResponse.json({ success: true, inviteLink: linkData.properties.action_link })
+    }
   }
+
+  if (existing) return NextResponse.json({ error: '이미 등록된 이메일입니다' }, { status: 400 })
 
   // 초대 이메일 발송 (본인이 비밀번호 직접 설정)
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
