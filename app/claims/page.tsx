@@ -178,11 +178,11 @@ export default function ClaimsPage() {
             <div style={{ fontSize: 13, marginTop: 4 }}>위 버튼으로 클레임을 등록하세요</div>
           </div>
         ) : sortedDates.map(date => (
-          <div key={date} style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 8, paddingLeft: 2 }}>
-              {date.replace(/-/g, '.')} ({grouped[date].length}건)
+          <div key={date} style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 6, paddingLeft: 4 }}>
+              {date.replace(/-/g, '.')}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {grouped[date].map(claim => {
                 const ss = STATUS_STYLE[claim.status] || STATUS_STYLE['접수']
                 const cs = CAT_STYLE[claim.category] || CAT_STYLE['기타']
@@ -193,30 +193,24 @@ export default function ClaimsPage() {
                     onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)')}
                     onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
                   >
-                    {/* 상태 아이콘 */}
-                    <div style={{ fontSize: 22, flexShrink: 0 }}>{ss.icon}</div>
-
-                    {/* 내용 */}
+                    {/* 왼쪽: 날짜 + 업체명 + 내용 */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{claim.company}</span>
-                        <span style={{ background: cs.bg, color: cs.text, borderRadius: 6, padding: '1px 8px', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{claim.category}</span>
-                        <span style={{ background: ss.bg, color: ss.text, borderRadius: 6, padding: '1px 8px', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{claim.status}</span>
+                      <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 3 }}>
+                        {claim.claim_date.replace(/-/g, '.')}
+                        {claim.category && <span style={{ background: cs.bg, color: cs.text, borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, marginLeft: 6 }}>{claim.category}</span>}
+                        {isAdmin && claim.profiles && <span style={{ marginLeft: 6 }}>{claim.profiles.name || claim.profiles.email}</span>}
                       </div>
-                      <div style={{ fontSize: 13, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{claim.content}</div>
-                      {isAdmin && claim.profiles && (
-                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>
-                          등록: {claim.profiles.name || claim.profiles.email}
-                        </div>
-                      )}
+                      <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{claim.company}</div>
+                      <div style={{ fontSize: 12, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{claim.content}</div>
                     </div>
 
-                    {/* 사진 수 + 화살표 */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                      {claim.photos?.length > 0 && (
-                        <span style={{ fontSize: 11, color: '#94a3b8' }}>📷{claim.photos.length}</span>
-                      )}
-                      <span style={{ color: '#94a3b8', fontSize: 22, fontWeight: 300 }}>›</span>
+                    {/* 오른쪽: 상태 뱃지 + 화살표 */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                      <span style={{ background: ss.bg, color: ss.text, borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{ss.icon} {claim.status}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {claim.photos?.length > 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>📷{claim.photos.length}</span>}
+                        <span style={{ color: '#94a3b8', fontSize: 22, fontWeight: 300 }}>›</span>
+                      </div>
                     </div>
                   </div>
                 )
