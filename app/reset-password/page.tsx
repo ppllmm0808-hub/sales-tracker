@@ -12,21 +12,53 @@ export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    let handled = false
+
+    // 1) Supabase가 자동으로 세션을 설정할 때 (해시/PKCE 모두 처리)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (handled) return
+      if ((event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') && session) {
+        handled = true
+        setReady(true)
+      }
+    })
+
+    // 2) PKCE 방식: ?code= 쿼리 파라미터 (카카오 인앱 브라우저 등)
+    const code = new URLSearchParams(window.location.search).get('code')
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+        if (handled) return
+        if (error) { setError('링크가 만료되었습니다. 다시 시도해주세요.'); return }
+        if (data.session) { handled = true; setReady(true) }
+      })
+      return () => subscription.unsubscribe()
+    }
+
+    // 3) Implicit 방식: #access_token= 해시 파라미터
     const hash = window.location.hash
-    if (hash.includes('type=recovery') || hash.includes('type=invite') || hash.includes('type=signup')) {
+    if (hash.includes('access_token')) {
       const params = new URLSearchParams(hash.slice(1))
       const accessToken = params.get('access_token')
       const refreshToken = params.get('refresh_token')
       if (accessToken && refreshToken) {
         supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-          .then(() => setReady(true))
-          .catch(() => setError('링크가 만료되었습니다. 다시 시도해주세요.'))
+          .then(({ error }) => {
+            if (handled) return
+            if (error) setError('링크가 만료되었습니다. 다시 시도해주세요.')
+            else { handled = true; setReady(true) }
+          })
       } else {
         setError('유효하지 않은 링크입니다.')
       }
-    } else {
-      router.replace('/login')
+      return () => subscription.unsubscribe()
     }
+
+    // 4) 아무것도 없으면 1.5초 후 로그인으로
+    const timer = setTimeout(() => {
+      if (!handled) router.replace('/login')
+    }, 1500)
+
+    return () => { subscription.unsubscribe(); clearTimeout(timer) }
   }, [router])
 
   async function handleSubmit(e: React.FormEvent) {
