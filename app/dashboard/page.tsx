@@ -824,7 +824,7 @@ export default function Dashboard() {
               <span style={{ fontWeight: 700, fontSize: 16 }}>💼 {editTarget ? '영업 활동 수정' : '영업 활동 등록'}</span>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>✕</button>
             </div>
-            <form onSubmit={handleSave} style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, overflowY: 'auto', flex: 1 }}>
+            <form onSubmit={handleSave} style={{ padding: isMobile ? '16px' : '24px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14, overflowY: 'auto', flex: 1 }}>
               <label style={lbl}>시작 시간 *<input type="time" required value={form.activity_time} onChange={e => setForm(p => ({ ...p, activity_time: e.target.value }))} style={inp} /></label>
               <label style={lbl}>종료 시간<input type="time" value={form.end_time} onChange={e => setForm(p => ({ ...p, end_time: e.target.value }))} style={inp} /></label>
               <label style={lbl}>활동 구분 *
