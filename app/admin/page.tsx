@@ -693,9 +693,6 @@ export default function AdminPage() {
                 <button type="button" onClick={handleCreateLink} disabled={userLoading} style={{ background: '#f59e0b', border: 'none', borderRadius: 10, padding: '12px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                   {userLoading ? '처리 중...' : '🔗 카톡 초대 링크 생성'}
                 </button>
-                <button type="submit" disabled={userLoading} style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-                  {userLoading ? '처리 중...' : '📧 메일 발송 (회사메일 차단될 수 있음)'}
-                </button>
               </form>
               {inviteLink && (
                 <div style={{ marginTop: 12, padding: 14, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 12 }}>
@@ -712,11 +709,7 @@ export default function AdminPage() {
               <div style={{ marginTop: 16, padding: 16, background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 12 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 8 }}>📲 앱 주소 카톡으로 공유</div>
                 <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 10, lineHeight: 1.7 }}>
-                  1. 아래 주소 복사 → 카톡으로 전송<br />
-                  2. 담당자가 주소 접속 → 로그인 화면<br />
-                  3. <b>비밀번호를 모르시나요?</b> 클릭<br />
-                  4. 이메일 입력 → 비밀번호 설정 메일 발송<br />
-                  5. 메일 링크 클릭 → 비밀번호 직접 설정
+                  비밀번호 설정 완료 후 아래 주소로 접속
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <div style={{ flex: 1, background: '#fff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
