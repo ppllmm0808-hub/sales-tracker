@@ -361,7 +361,7 @@ export default function AdminPage() {
     const logs: any[] = Array.isArray(logsRes.logs) ? logsRes.logs : []
     const activities: Activity[] = Array.isArray(logsRes.activities) ? logsRes.activities : []
     const logMap = new Map(logs.map(l => [l.user_id, l]))
-    const otherProfiles = profiles.filter(p => p.id !== myId)
+    const otherProfiles = profiles.filter(p => p.role === 'member')
     const data: MemberData[] = otherProfiles.map((prof, i) => {
       const log = logMap.get(prof.id)
       const fakeLog: SalesLog & { profiles?: Profile } = log
