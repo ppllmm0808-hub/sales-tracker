@@ -350,31 +350,33 @@ export default function AdminPage() {
   const [reportLoading, setReportLoading] = useState(false)
 
   const loadData = useCallback(async (date: string, myId?: string, token?: string) => {
+    if (!token) return
     setLoading(true)
-    const [profilesRes, logs] = await Promise.all([
-      token ? fetch('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()) : Promise.resolve([]),
-      getAllLogsForDate(date),
+    const headers = { Authorization: `Bearer ${token}` }
+    const [profilesRes, logsRes] = await Promise.all([
+      fetch('/api/admin/users', { headers }).then(r => r.json()),
+      fetch(`/api/admin/logs?date=${date}`, { headers }).then(r => r.json()),
     ])
     const profiles: Profile[] = Array.isArray(profilesRes) ? profilesRes : []
+    const logs: any[] = Array.isArray(logsRes.logs) ? logsRes.logs : []
+    const activities: Activity[] = Array.isArray(logsRes.activities) ? logsRes.activities : []
     const logMap = new Map(logs.map(l => [l.user_id, l]))
     const otherProfiles = profiles.filter(p => p.id !== myId)
-    const logIds = otherProfiles.map(p => logMap.get(p.id)?.id).filter(Boolean) as string[]
-    const acts = logIds.length ? await getActivitiesByLogIds(logIds) : []
-    const data: MemberData[] = otherProfiles.map((profile, i) => {
-      const log = logMap.get(profile.id)
+    const data: MemberData[] = otherProfiles.map((prof, i) => {
+      const log = logMap.get(prof.id)
       const fakeLog: SalesLog & { profiles?: Profile } = log
-        ? { ...(log as any), profiles: profile }
+        ? { ...log, profiles: prof }
         : {
-            id: `nolog-${profile.id}`,
-            user_id: profile.id,
+            id: `nolog-${prof.id}`,
+            user_id: prof.id,
             log_date: date,
             summary: null, weather: null, is_working: false,
             check_in_time: null, check_in_lat: null, check_in_lng: null, check_in_address: null,
-            created_at: '', updated_at: '', profiles: profile,
+            created_at: '', updated_at: '', profiles: prof,
           }
       return {
         log: fakeLog,
-        activities: log ? acts.filter(a => a.log_id === log.id) : [],
+        activities: log ? activities.filter(a => a.log_id === log.id) : [],
         color: MEMBER_COLORS[i % MEMBER_COLORS.length],
       }
     })
