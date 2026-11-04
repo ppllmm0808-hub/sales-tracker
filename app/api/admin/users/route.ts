@@ -1,18 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 async function verifyAdmin(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) return null
-  const { data: { user } } = await supabaseAdmin.auth.getUser(token)
+  const { data: { user } } = await getSupabaseAdmin().auth.getUser(token)
   if (!user) return null
-  const { data: profile } = await supabaseAdmin.from('profiles').select('role, email').eq('id', user.id).single()
+  const { data: profile } = await getSupabaseAdmin().from('profiles').select('role, email').eq('id', user.id).single()
   return (profile?.role === 'admin' || profile?.role === 'owner') ? { ...user, role: profile.role, profileEmail: profile.email } : null
 }
 
@@ -21,7 +23,7 @@ export async function GET(req: NextRequest) {
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
   // owner는 항상 숨김. admin-role 호출자는 admin도 숨김 (member만 조회)
-  let query = supabaseAdmin.from('profiles').select('*').neq('role', 'owner').order('created_at')
+  let query = getSupabaseAdmin().from('profiles').select('*').neq('role', 'owner').order('created_at')
   if ((admin as any).role === 'admin') {
     query = query.neq('role', 'admin')
   }
@@ -37,18 +39,18 @@ export async function POST(req: NextRequest) {
   if (!email) return NextResponse.json({ error: '이메일을 입력하세요' }, { status: 400 })
 
   // 이미 등록된 이메일 확인
-  const { data: existing } = await supabaseAdmin.from('profiles').select('id').eq('email', email).single()
+  const { data: existing } = await getSupabaseAdmin().from('profiles').select('id').eq('email', email).single()
   if (existing) return NextResponse.json({ error: '이미 등록된 이메일입니다' }, { status: 400 })
 
   // 구글 로그인용 계정 미리 생성 (이메일 발송 없음)
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+  const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
     email,
     email_confirm: true,
     user_metadata: { name, role: role || 'member' },
   })
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
 
-  await supabaseAdmin.from('profiles').upsert({
+  await getSupabaseAdmin().from('profiles').upsert({
     id: authData.user.id, email, name: name || null, role: role || 'member',
   })
 
@@ -73,7 +75,7 @@ export async function PATCH(req: NextRequest) {
   if (name !== undefined) updates.name = name
   if (role !== undefined) updates.role = role
   if (Object.keys(updates).length > 0)
-    await supabaseAdmin.from('profiles').update(updates).eq('id', id)
+    await getSupabaseAdmin().from('profiles').update(updates).eq('id', id)
 
   return NextResponse.json({ success: true })
 }
@@ -85,8 +87,8 @@ export async function DELETE(req: NextRequest) {
   const { id } = await req.json()
   if (!id) return NextResponse.json({ error: 'id 필요' }, { status: 400 })
 
-  await supabaseAdmin.from('profiles').delete().eq('id', id)
-  await supabaseAdmin.auth.admin.deleteUser(id)
+  await getSupabaseAdmin().from('profiles').delete().eq('id', id)
+  await getSupabaseAdmin().auth.admin.deleteUser(id)
 
   return NextResponse.json({ success: true })
 }

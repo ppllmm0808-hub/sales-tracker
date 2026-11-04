@@ -1,18 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 async function verifyAdmin(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) return null
-  const { data: { user } } = await supabaseAdmin.auth.getUser(token)
+  const { data: { user } } = await getSupabaseAdmin().auth.getUser(token)
   if (!user) return null
-  const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await getSupabaseAdmin().from('profiles').select('role').eq('id', user.id).single()
   return (profile?.role === 'admin' || profile?.role === 'owner') ? { ...user, role: profile.role } : null
 }
 

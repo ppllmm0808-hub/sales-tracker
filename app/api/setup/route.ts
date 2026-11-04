@@ -1,11 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 const OWNER_EMAIL = 'ppllmm0808@gmail.com'
 
@@ -13,7 +15,7 @@ export async function POST(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-  const { data: { user } } = await supabaseAdmin.auth.getUser(token)
+  const { data: { user } } = await getSupabaseAdmin().auth.getUser(token)
   if (!user || user.email !== OWNER_EMAIL) {
     return NextResponse.json({ error: '권한 없음 — 프로그램 관리자 계정으로만 실행 가능합니다' }, { status: 403 })
   }
