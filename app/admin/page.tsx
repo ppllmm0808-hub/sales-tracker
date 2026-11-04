@@ -322,6 +322,8 @@ function AdminMap({ members }: { members: MemberData[] }) {
 export default function AdminPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [myId, setMyId] = useState<string | undefined>()
+  const [authToken, setAuthToken] = useState<string | undefined>()
   const [selectedDate, setSelectedDate] = useState(toDateStr(new Date()))
   const [members, setMembers] = useState<MemberData[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -347,9 +349,13 @@ export default function AdminPage() {
   const [reportData, setReportData] = useState<any[]>([])
   const [reportLoading, setReportLoading] = useState(false)
 
-  const loadData = useCallback(async (date: string, myId?: string) => {
+  const loadData = useCallback(async (date: string, myId?: string, token?: string) => {
     setLoading(true)
-    const [profiles, logs] = await Promise.all([getAllProfiles(), getAllLogsForDate(date)])
+    const [profilesRes, logs] = await Promise.all([
+      token ? fetch('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()) : Promise.resolve([]),
+      getAllLogsForDate(date),
+    ])
+    const profiles: Profile[] = Array.isArray(profilesRes) ? profilesRes : []
     const logMap = new Map(logs.map(l => [l.user_id, l]))
     const otherProfiles = profiles.filter(p => p.id !== myId)
     const logIds = otherProfiles.map(p => logMap.get(p.id)?.id).filter(Boolean) as string[]
@@ -387,10 +393,17 @@ export default function AdminPage() {
       const p = await getProfile(data.session.user.id)
       if (!p || (p.role !== 'admin' && p.role !== 'owner')) { router.push('/dashboard'); return }
       setProfile(p)
-      const myId = data.session.user.id
-      await Promise.all([loadData(selectedDate, myId), loadUsers(data.session.access_token)])
+      const uid = data.session.user.id
+      const tok = data.session.access_token
+      setMyId(uid)
+      setAuthToken(tok)
+      await Promise.all([loadData(selectedDate, uid, tok), loadUsers(tok)])
     })
-  }, [router, loadData, loadUsers, selectedDate])
+  }, [router]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (myId && authToken) loadData(selectedDate, myId, authToken)
+  }, [selectedDate, myId, authToken, loadData])
 
   async function getToken() {
     const { data } = await supabase.auth.getSession()
