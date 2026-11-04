@@ -347,6 +347,14 @@ export default function AdminPage() {
   const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1)
   const [reportData, setReportData] = useState<any[]>([])
   const [reportLoading, setReportLoading] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   const loadData = useCallback(async (date: string, myId?: string, token?: string) => {
     if (!token) return
@@ -532,25 +540,25 @@ export default function AdminPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       {/* Header */}
-      <header style={{ background: '#0f172a', color: '#fff', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '6px 10px', fontSize: 20 }}>👑</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>관리자 대시보드</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>영업팀 전체 현황</div>
+      <header style={{ background: '#0f172a', color: '#fff', padding: isMobile ? '10px 14px' : '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, minWidth: 0 }}>
+          <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '6px 10px', fontSize: 20, flexShrink: 0 }}>👑</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: isMobile ? 14 : 16, whiteSpace: 'nowrap' }}>관리자</div>
+            {!isMobile && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>영업팀 전체 현황</div>}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: isMobile ? 6 : 8, alignItems: 'center', flexShrink: 0 }}>
           <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 14 }} />
-          <button onClick={() => router.push('/dashboard')} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: '6px 14px', color: '#fff', cursor: 'pointer', fontSize: 13 }}>내 일지</button>
-          <button onClick={async () => { await supabase.auth.signOut(); router.push('/login') }} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '6px 14px', color: '#fff', cursor: 'pointer', fontSize: 13 }}>로그아웃</button>
+            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: isMobile ? '5px 7px' : '6px 10px', color: '#fff', fontSize: isMobile ? 12 : 14, width: isMobile ? 120 : 'auto' }} />
+          <button onClick={() => router.push('/dashboard')} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>{isMobile ? '일지' : '내 일지'}</button>
+          <button onClick={async () => { await supabase.auth.signOut(); router.push('/login') }} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>나가기</button>
         </div>
       </header>
 
-      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px' }}>
+      <main style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '16px 12px' : '24px 16px' }}>
         {/* 요약 스탯 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? 10 : 14, marginBottom: isMobile ? 16 : 24 }}>
           {[
             { label: '총 인원', value: `${members.length}명`, sub: '등록된 영업사원', color: '#4f46e5', bg: '#eef2ff' },
             { label: '출근 완료', value: `${checkedIn}명`, sub: `미출근 ${members.length - checkedIn}명`, color: '#059669', bg: '#f0fdf4' },
@@ -566,9 +574,9 @@ export default function AdminPage() {
         </div>
 
         {/* 탭 */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {([['list','👥 팀원 현황'],['map','🗺️ 이동 경로'],['report','📊 월간 리포트'],['users','⚙️ 계정 관리'],['export','📥 내보내기']] as const).map(([m, label]) => (
-            <button key={m} onClick={() => { setViewMode(m); setUserMsg('') }} style={{ padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === m ? '#0f172a' : '#f1f5f9', color: viewMode === m ? '#fff' : '#64748b' }}>{label}</button>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any, flexWrap: 'nowrap', paddingBottom: 2 }}>
+          {([['list', isMobile ? '👥' : '👥 팀원 현황'],['map', isMobile ? '🗺️' : '🗺️ 이동 경로'],['report', isMobile ? '📊' : '📊 월간 리포트'],['users', isMobile ? '⚙️' : '⚙️ 계정 관리'],['export', isMobile ? '📥' : '📥 내보내기']] as const).map(([m, label]) => (
+            <button key={m} onClick={() => { setViewMode(m); setUserMsg('') }} style={{ padding: isMobile ? '7px 12px' : '7px 18px', borderRadius: 8, fontSize: isMobile ? 12 : 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === m ? '#0f172a' : '#f1f5f9', color: viewMode === m ? '#fff' : '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>{label}</button>
           ))}
         </div>
 
