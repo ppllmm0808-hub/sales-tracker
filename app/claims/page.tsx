@@ -229,13 +229,13 @@ export default function ClaimsPage() {
       {/* 등록 모달 */}
       {showForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 600, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 600, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ background: '#dc2626', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <span style={{ fontWeight: 700, fontSize: 16 }}>📋 클레임 등록</span>
               <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>✕</button>
             </div>
-            <form onSubmit={handleSubmit} style={{ padding: '20px 20px 0', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <form onSubmit={handleSubmit} style={{ padding: '20px 20px 0', overflowY: 'auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
                 <label style={lbl}>날짜 *<input type="date" required value={form.claim_date} onChange={e => setForm(p => ({ ...p, claim_date: e.target.value }))} style={inp} /></label>
                 <label style={lbl}>클레임 유형 *
                   <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} style={inp}>
@@ -243,7 +243,7 @@ export default function ClaimsPage() {
                   </select>
                 </label>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
                 <label style={lbl}>거래처명 *<input type="text" required value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))} style={inp} placeholder="거래처명" /></label>
                 <label style={lbl}>담당자<input type="text" value={form.contact} onChange={e => setForm(p => ({ ...p, contact: e.target.value }))} style={inp} placeholder="담당자명" /></label>
               </div>
