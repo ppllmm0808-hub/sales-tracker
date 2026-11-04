@@ -488,28 +488,30 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       {/* Header */}
-      <header style={{ background: '#4f46e5', color: '#fff', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: '6px 10px', fontSize: 20 }}>💼</div>
+      <header style={{ background: '#4f46e5', color: '#fff', padding: isMobile ? '10px 14px' : '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 8, padding: '5px 8px', fontSize: 18 }}>💼</div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>영업활동일지</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>8시간 타임라인 영업활동 자동화 시스템</div>
+            <div style={{ fontWeight: 700, fontSize: isMobile ? 14 : 16 }}>영업활동일지</div>
+            {!isMobile && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>8시간 타임라인 영업활동 자동화 시스템</div>}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={exportCSV} style={headerBtn('#059669')}>📥 CSV</button>
-          <button onClick={copyToClipboard} style={headerBtn('#0284c7')}>📋 복사</button>
-          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginLeft: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* 데스크탑: 버튼 전부 표시 */}
+          {!isMobile && <>
+            <button onClick={exportCSV} style={headerBtn('#059669')}>📥 CSV</button>
+            <button onClick={copyToClipboard} style={headerBtn('#0284c7')}>📋 복사</button>
+          </>}
+          <span style={{ fontSize: isMobile ? 12 : 13, color: 'rgba(255,255,255,0.9)', maxWidth: isMobile ? 70 : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {profile.name || profile.email}
-            {profile.role === 'admin' && <span style={{ marginLeft: 6, background: '#f59e0b', color: '#000', borderRadius: 4, padding: '1px 6px', fontSize: 11 }}>관리자</span>}
           </span>
           {(profile.role === 'admin' || profile.role === 'owner') && (
-            <button onClick={() => router.push('/admin')} style={{ background: profile.role === 'owner' ? '#f59e0b' : 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: '6px 14px', color: profile.role === 'owner' ? '#000' : '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
-              {profile.role === 'owner' ? '⭐ 관리자' : '👑 관리자'}
+            <button onClick={() => router.push('/admin')} style={{ background: profile.role === 'owner' ? '#f59e0b' : 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 8px' : '6px 14px', color: profile.role === 'owner' ? '#000' : '#fff', cursor: 'pointer', fontSize: isMobile ? 11 : 13, fontWeight: 700 }}>
+              {profile.role === 'owner' ? '⭐' : '👑'}{!isMobile && ' 관리자'}
             </button>
           )}
-          <button onClick={() => { setShowPwModal(true); setPwMsg('') }} style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '6px 12px', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: 12 }}>🔑 비번변경</button>
-          <button onClick={async () => { await supabase.auth.signOut(); router.push('/login') }} style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, padding: '6px 14px', color: '#fff', cursor: 'pointer', fontSize: 13 }}>로그아웃</button>
+          <button onClick={() => { setShowPwModal(true); setPwMsg('') }} style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: isMobile ? '5px 8px' : '6px 12px', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: isMobile ? 11 : 12 }}>🔑{!isMobile && ' 비번변경'}</button>
+          <button onClick={async () => { await supabase.auth.signOut(); router.push('/login') }} style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, padding: isMobile ? '5px 8px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 11 : 13 }}>{isMobile ? '나가기' : '로그아웃'}</button>
         </div>
       </header>
 
