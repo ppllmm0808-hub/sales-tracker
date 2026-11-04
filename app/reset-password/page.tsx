@@ -13,7 +13,7 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const hash = window.location.hash
-    if (hash.includes('type=recovery')) {
+    if (hash.includes('type=recovery') || hash.includes('type=invite') || hash.includes('type=signup')) {
       const params = new URLSearchParams(hash.slice(1))
       const accessToken = params.get('access_token')
       const refreshToken = params.get('refresh_token')
