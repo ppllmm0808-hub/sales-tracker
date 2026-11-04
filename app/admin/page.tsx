@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase, getAllLogsForDate, getActivitiesByLogIds, getProfile } from '@/lib/supabase'
+import { supabase, getAllLogsForDate, getActivitiesByLogIds, getProfile, getAllProfiles } from '@/lib/supabase'
 import type { SalesLog, Activity, Profile } from '@/lib/supabase'
 
 const MEMBER_COLORS = ['#4f46e5','#059669','#dc2626','#d97706','#7c3aed','#0284c7','#be185d','#065f46']
@@ -349,14 +349,29 @@ export default function AdminPage() {
 
   const loadData = useCallback(async (date: string, myId?: string) => {
     setLoading(true)
-    const logs = await getAllLogsForDate(date)
-    const memberLogs = logs.filter(l => (l as any).profiles && l.user_id !== myId)
-    const acts = await getActivitiesByLogIds(memberLogs.map(l => l.id))
-    const data: MemberData[] = memberLogs.map((log, i) => ({
-      log: log as any,
-      activities: acts.filter(a => a.log_id === log.id),
-      color: MEMBER_COLORS[i % MEMBER_COLORS.length],
-    }))
+    const [profiles, logs] = await Promise.all([getAllProfiles(), getAllLogsForDate(date)])
+    const logMap = new Map(logs.map(l => [l.user_id, l]))
+    const otherProfiles = profiles.filter(p => p.id !== myId)
+    const logIds = otherProfiles.map(p => logMap.get(p.id)?.id).filter(Boolean) as string[]
+    const acts = logIds.length ? await getActivitiesByLogIds(logIds) : []
+    const data: MemberData[] = otherProfiles.map((profile, i) => {
+      const log = logMap.get(profile.id)
+      const fakeLog: SalesLog & { profiles?: Profile } = log
+        ? { ...(log as any), profiles: profile }
+        : {
+            id: `nolog-${profile.id}`,
+            user_id: profile.id,
+            log_date: date,
+            summary: null, weather: null, is_working: false,
+            check_in_time: null, check_in_lat: null, check_in_lng: null, check_in_address: null,
+            created_at: '', updated_at: '', profiles: profile,
+          }
+      return {
+        log: fakeLog,
+        activities: log ? acts.filter(a => a.log_id === log.id) : [],
+        color: MEMBER_COLORS[i % MEMBER_COLORS.length],
+      }
+    })
     setMembers(data)
     setLoading(false)
   }, [])

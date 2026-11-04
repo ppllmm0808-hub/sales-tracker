@@ -101,6 +101,11 @@ export async function getAllLogsForDate(date: string): Promise<SalesLog[]> {
   return data ?? []
 }
 
+export async function getAllProfiles(): Promise<Profile[]> {
+  const { data } = await supabase.from('profiles').select('*').order('created_at')
+  return data ?? []
+}
+
 export async function getActivitiesByLogIds(logIds: string[]): Promise<Activity[]> {
   if (!logIds.length) return []
   const { data } = await supabase
