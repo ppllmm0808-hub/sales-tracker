@@ -331,7 +331,7 @@ export default function AdminPage() {
   const [viewMode, setViewMode] = useState<'list' | 'map' | 'users' | 'export' | 'report'>('list')
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
   const [users, setUsers] = useState<Profile[]>([])
-  const [userForm, setUserForm] = useState({ email: '', name: '', role: 'member' })
+  const [userForm, setUserForm] = useState({ email: '', name: '', role: 'member', password: '' })
   const [editUser, setEditUser] = useState<Profile | null>(null)
   const [editForm, setEditForm] = useState({ name: '', role: 'member' })
   const [userLoading, setUserLoading] = useState(false)
@@ -421,8 +421,8 @@ export default function AdminPage() {
     })
     const data = await res.json()
     if (res.ok) {
-      setUserMsg('✅ 등록됐습니다. 이제 구글로 로그인하면 됩니다.')
-      setUserForm({ email: '', name: '', role: 'member' })
+      setUserMsg('✅ 계정이 생성됐습니다. 임시 비밀번호를 카톡으로 전달하세요.')
+      setUserForm({ email: '', name: '', role: 'member', password: '' })
       await loadUsers(token)
     } else {
       setUserMsg(`❌ ${data.error}`)
@@ -648,12 +648,14 @@ export default function AdminPage() {
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 24 }}>
               <h3 style={{ fontWeight: 700, fontSize: 16, color: '#0f172a', marginBottom: 4 }}>➕ 새 계정 등록</h3>
               <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16, lineHeight: 1.6 }}>
-                이메일을 등록하면 해당 구글 계정으로 로그인 가능합니다
+                이메일과 임시 비밀번호를 카톡으로 전달하세요.<br />
+                사용자가 로그인 후 직접 비밀번호를 변경합니다.
               </p>
               <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {[
                   { label: '이름', key: 'name', type: 'text', placeholder: '홍길동' },
-                  { label: '이메일 (구글 계정) *', key: 'email', type: 'email', placeholder: 'user@gmail.com' },
+                  { label: '이메일 *', key: 'email', type: 'email', placeholder: 'user@company.com' },
+                  { label: '임시 비밀번호 *', key: 'password', type: 'text', placeholder: '예: Korea2024! (6자 이상)' },
                 ].map(f => (
                   <label key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#475569' }}>
                     {f.label}
@@ -680,7 +682,7 @@ export default function AdminPage() {
               <div style={{ marginTop: 16, padding: 16, background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 12 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 8 }}>📲 앱 주소 카톡으로 공유</div>
                 <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 10, lineHeight: 1.7 }}>
-                  등록 완료 후 아래 주소를 카톡으로 전달 → 구글 로그인
+                  아래 주소 + 이메일 + 임시 비밀번호를 카톡으로 전달
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <div style={{ flex: 1, background: '#fff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -707,9 +709,8 @@ export default function AdminPage() {
                   <div key={u.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px' }}>
                     {editUser?.id === u.id ? (
                       <form onSubmit={handleUpdateUser} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          <input placeholder="이름" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} style={iStyle} />
-                        </div>
+                        <input placeholder="이름" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} style={iStyle} />
+                        <input placeholder="비밀번호 초기화 (입력 시 변경)" value={(editForm as any).password || ''} onChange={e => setEditForm(p => ({ ...p, password: e.target.value }))} style={iStyle} />
                         <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))} style={iStyle}>
                           <option value="member">담당자</option>
                           <option value="admin">관리자</option>

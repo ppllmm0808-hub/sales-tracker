@@ -35,16 +35,17 @@ export async function POST(req: NextRequest) {
   const admin = await verifyAdmin(req)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
-  const { email, name, role } = await req.json()
+  const { email, name, role, password } = await req.json()
   if (!email) return NextResponse.json({ error: '이메일을 입력하세요' }, { status: 400 })
 
   // 이미 등록된 이메일 확인
   const { data: existing } = await getSupabaseAdmin().from('profiles').select('id').eq('email', email).single()
   if (existing) return NextResponse.json({ error: '이미 등록된 이메일입니다' }, { status: 400 })
 
-  // 구글 로그인용 계정 미리 생성 (이메일 발송 없음)
+  // 계정 생성 (이메일 발송 없음, 임시 비밀번호 설정)
   const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
     email,
+    password: password || undefined,
     email_confirm: true,
     user_metadata: { name, role: role || 'member' },
   })
@@ -61,7 +62,7 @@ export async function PATCH(req: NextRequest) {
   const admin = await verifyAdmin(req)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
-  const { id, name, role } = await req.json()
+  const { id, name, role, password } = await req.json()
   if (!id) return NextResponse.json({ error: 'id 필요' }, { status: 400 })
 
   // admin/owner 승격은 owner만 가능
@@ -69,6 +70,12 @@ export async function PATCH(req: NextRequest) {
     if ((admin as any).role !== 'owner') {
       return NextResponse.json({ error: '관리자 지정은 프로그램 관리자만 가능합니다.' }, { status: 403 })
     }
+  }
+
+  // 비밀번호 변경 (관리자가 초기화)
+  if (password) {
+    const { error: pwError } = await getSupabaseAdmin().auth.admin.updateUserById(id, { password })
+    if (pwError) return NextResponse.json({ error: pwError.message }, { status: 400 })
   }
 
   const updates: any = {}

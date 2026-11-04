@@ -196,6 +196,10 @@ export default function Dashboard() {
   const [gpsLoading, setGpsLoading] = useState(false)
   const [formCoords, setFormCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [checkInLoading, setCheckInLoading] = useState(false)
+  const [showPwModal, setShowPwModal] = useState(false)
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
+  const [pwLoading, setPwLoading] = useState(false)
+  const [pwMsg, setPwMsg] = useState('')
   const [timerStart, setTimerStart] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -444,6 +448,26 @@ export default function Dashboard() {
     URL.revokeObjectURL(url)
   }
 
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault()
+    if (pwForm.next !== pwForm.confirm) { setPwMsg('❌ 새 비밀번호가 일치하지 않습니다'); return }
+    if (pwForm.next.length < 6) { setPwMsg('❌ 비밀번호는 6자 이상이어야 합니다'); return }
+    setPwLoading(true); setPwMsg('')
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (!token) { setPwMsg('❌ 세션이 만료됐습니다. 다시 로그인하세요'); setPwLoading(false); return }
+    const res = await fetch('/api/me/password', {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pwForm.next }),
+    })
+    const result = await res.json()
+    if (!res.ok) { setPwMsg('❌ ' + result.error); setPwLoading(false); return }
+    setPwMsg('✅ 비밀번호가 변경됐습니다!')
+    setPwLoading(false)
+    setTimeout(() => { setShowPwModal(false); setPwForm({ current: '', next: '', confirm: '' }); setPwMsg('') }, 1500)
+  }
+
   function copyToClipboard() {
     const text = sorted.map(a =>
       `${a.activity_time}${a.end_time ? '~' + a.end_time : ''}\t${a.activity_type}\t${a.company || ''}\t${a.address || ''}\t${a.content || ''}\t${a.result || ''}\t${a.next_action || ''}`
@@ -484,9 +508,36 @@ export default function Dashboard() {
               {profile.role === 'owner' ? '⭐ 관리자' : '👑 관리자'}
             </button>
           )}
+          <button onClick={() => { setShowPwModal(true); setPwMsg('') }} style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '6px 12px', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: 12 }}>🔑 비번변경</button>
           <button onClick={async () => { await supabase.auth.signOut(); router.push('/login') }} style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, padding: '6px 14px', color: '#fff', cursor: 'pointer', fontSize: 13 }}>로그아웃</button>
         </div>
       </header>
+
+      {/* 비밀번호 변경 모달 */}
+      {showPwModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 32, width: '100%', maxWidth: 360 }}>
+            <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700, color: '#0f172a' }}>🔑 비밀번호 변경</h3>
+            <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input type="password" placeholder="새 비밀번호 (6자 이상)" value={pwForm.next}
+                onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))} required
+                style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px', fontSize: 14 }} />
+              <input type="password" placeholder="새 비밀번호 확인" value={pwForm.confirm}
+                onChange={e => setPwForm(p => ({ ...p, confirm: e.target.value }))} required
+                style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px', fontSize: 14 }} />
+              {pwMsg && <p style={{ fontSize: 13, color: pwMsg.startsWith('✅') ? '#059669' : '#dc2626', margin: 0 }}>{pwMsg}</p>}
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <button type="submit" disabled={pwLoading} style={{ flex: 1, background: '#4f46e5', border: 'none', borderRadius: 8, padding: '11px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+                  {pwLoading ? '처리 중...' : '변경'}
+                </button>
+                <button type="button" onClick={() => setShowPwModal(false)} style={{ flex: 1, background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '11px', color: '#64748b', cursor: 'pointer', fontSize: 14 }}>
+                  취소
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '16px 12px' : '24px 16px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '320px 1fr', gap: isMobile ? 12 : 20 }}>
         {/* Left Column */}
