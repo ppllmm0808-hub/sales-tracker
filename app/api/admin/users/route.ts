@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   const admin = await verifyAdmin(req)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
-  const { email, name, role, password } = await req.json()
+  const { email, name, role } = await req.json()
   if (!email) return NextResponse.json({ error: '이메일을 입력하세요' }, { status: 400 })
 
   // 이미 등록된 이메일 확인
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   // 계정 생성 (이메일 발송 없음, 임시 비밀번호 설정)
   const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
     email,
-    password: password || undefined,
+    password: '00000000',
     email_confirm: true,
     user_metadata: { name, role: role || 'member' },
   })

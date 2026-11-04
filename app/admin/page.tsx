@@ -331,7 +331,7 @@ export default function AdminPage() {
   const [viewMode, setViewMode] = useState<'list' | 'map' | 'users' | 'export' | 'report'>('list')
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
   const [users, setUsers] = useState<Profile[]>([])
-  const [userForm, setUserForm] = useState({ email: '', name: '', role: 'member', password: '' })
+  const [userForm, setUserForm] = useState({ email: '', name: '', role: 'member' })
   const [editUser, setEditUser] = useState<Profile | null>(null)
   const [editForm, setEditForm] = useState({ name: '', role: 'member' })
   const [userLoading, setUserLoading] = useState(false)
@@ -421,8 +421,8 @@ export default function AdminPage() {
     })
     const data = await res.json()
     if (res.ok) {
-      setUserMsg('✅ 계정이 생성됐습니다. 임시 비밀번호를 카톡으로 전달하세요.')
-      setUserForm({ email: '', name: '', role: 'member', password: '' })
+      setUserMsg('✅ 계정 생성 완료! 초기 비밀번호: 00000000')
+      setUserForm({ email: '', name: '', role: 'member' })
       await loadUsers(token)
     } else {
       setUserMsg(`❌ ${data.error}`)
@@ -648,14 +648,13 @@ export default function AdminPage() {
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 24 }}>
               <h3 style={{ fontWeight: 700, fontSize: 16, color: '#0f172a', marginBottom: 4 }}>➕ 새 계정 등록</h3>
               <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16, lineHeight: 1.6 }}>
-                이메일과 임시 비밀번호를 카톡으로 전달하세요.<br />
-                사용자가 로그인 후 직접 비밀번호를 변경합니다.
+                등록 후 초기 비밀번호는 <b style={{color:'#0f172a'}}>00000000</b> 입니다.<br />
+                사용자가 로그인 후 직접 변경합니다.
               </p>
               <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {[
                   { label: '이름', key: 'name', type: 'text', placeholder: '홍길동' },
                   { label: '이메일 *', key: 'email', type: 'email', placeholder: 'user@company.com' },
-                  { label: '임시 비밀번호 *', key: 'password', type: 'text', placeholder: '예: Korea2024! (6자 이상)' },
                 ].map(f => (
                   <label key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#475569' }}>
                     {f.label}
@@ -682,7 +681,7 @@ export default function AdminPage() {
               <div style={{ marginTop: 16, padding: 16, background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 12 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 8 }}>📲 앱 주소 카톡으로 공유</div>
                 <div style={{ fontSize: 11, color: '#0284c7', marginBottom: 10, lineHeight: 1.7 }}>
-                  아래 주소 + 이메일 + 임시 비밀번호를 카톡으로 전달
+                  아래 주소 + 이메일 + 초기 비밀번호(<b>00000000</b>)를 카톡으로 전달
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <div style={{ flex: 1, background: '#fff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
