@@ -347,10 +347,10 @@ export default function AdminPage() {
   const [reportData, setReportData] = useState<any[]>([])
   const [reportLoading, setReportLoading] = useState(false)
 
-  const loadData = useCallback(async (date: string) => {
+  const loadData = useCallback(async (date: string, myId?: string) => {
     setLoading(true)
     const logs = await getAllLogsForDate(date)
-    const memberLogs = logs.filter(l => (l as any).profiles)
+    const memberLogs = logs.filter(l => (l as any).profiles && l.user_id !== myId)
     const acts = await getActivitiesByLogIds(memberLogs.map(l => l.id))
     const data: MemberData[] = memberLogs.map((log, i) => ({
       log: log as any,
@@ -372,7 +372,8 @@ export default function AdminPage() {
       const p = await getProfile(data.session.user.id)
       if (!p || (p.role !== 'admin' && p.role !== 'owner')) { router.push('/dashboard'); return }
       setProfile(p)
-      await Promise.all([loadData(selectedDate), loadUsers(data.session.access_token)])
+      const myId = data.session.user.id
+      await Promise.all([loadData(selectedDate, myId), loadUsers(data.session.access_token)])
     })
   }, [router, loadData, loadUsers, selectedDate])
 

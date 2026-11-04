@@ -33,8 +33,8 @@ export async function GET(req: NextRequest) {
     .order('log_date')
     .order('user_id')
 
-  // 관리자/owner 본인 데이터 제외, 담당자(member)만 포함
-  const logs = (rawLogs || []).filter(l => (l.profiles as any)?.role === 'member')
+  // 요청한 관리자 본인 데이터만 제외 (다른 관리자는 포함)
+  const logs = (rawLogs || []).filter(l => l.user_id !== admin.id)
 
   if (!logs || logs.length === 0) return NextResponse.json([])
 
