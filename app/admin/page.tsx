@@ -329,6 +329,7 @@ export default function AdminPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'list' | 'map' | 'users' | 'export' | 'report'>('list')
+  const [pendingClaims, setPendingClaims] = useState(0)
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
   const [users, setUsers] = useState<Profile[]>([])
   const [userForm, setUserForm] = useState({ email: '', name: '', role: 'member' })
@@ -407,6 +408,11 @@ export default function AdminPage() {
       setMyId(uid)
       setAuthToken(tok)
       await Promise.all([loadData(selectedDate, uid, tok), loadUsers(tok)])
+      // 미처리 클레임 수 로드
+      fetch('/api/claims', { headers: { Authorization: `Bearer ${tok}` } })
+        .then(r => r.json()).then(list => {
+          if (Array.isArray(list)) setPendingClaims(list.filter((c: any) => c.status !== '완료').length)
+        }).catch(() => {})
     })
   }, [router]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -551,6 +557,12 @@ export default function AdminPage() {
         <div style={{ display: 'flex', gap: isMobile ? 6 : 8, alignItems: 'center', flexShrink: 0 }}>
           <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
             style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: isMobile ? '5px 7px' : '6px 10px', color: '#fff', fontSize: isMobile ? 12 : 14, width: isMobile ? 120 : 'auto' }} />
+          <button onClick={() => router.push('/claims')} style={{ position: 'relative', background: 'rgba(220,38,38,0.7)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap', fontWeight: 700 }}>
+            📋{!isMobile && ' 클레임'}
+            {pendingClaims > 0 && (
+              <span style={{ position: 'absolute', top: -6, right: -6, background: '#fbbf24', color: '#000', borderRadius: 20, padding: '1px 6px', fontSize: 10, fontWeight: 800, lineHeight: 1.4 }}>{pendingClaims}</span>
+            )}
+          </button>
           <button onClick={() => router.push('/dashboard')} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>{isMobile ? '일지' : '내 일지'}</button>
           <button onClick={async () => { await supabase.auth.signOut(); router.push('/login') }} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>나가기</button>
         </div>

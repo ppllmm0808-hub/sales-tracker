@@ -505,6 +505,9 @@ export default function Dashboard() {
           <span style={{ fontSize: isMobile ? 12 : 13, color: 'rgba(255,255,255,0.9)', maxWidth: isMobile ? 70 : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {profile.name || profile.email}
           </span>
+          <button onClick={() => router.push('/claims')} style={{ background: 'rgba(220,38,38,0.8)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 8px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 11 : 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
+            📋{!isMobile && ' 클레임'}
+          </button>
           {(profile.role === 'admin' || profile.role === 'owner') && (
             <button onClick={() => router.push('/admin')} style={{ background: profile.role === 'owner' ? '#f59e0b' : 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 8px' : '6px 14px', color: profile.role === 'owner' ? '#000' : '#fff', cursor: 'pointer', fontSize: isMobile ? 11 : 13, fontWeight: 700 }}>
               {profile.role === 'owner' ? '⭐' : '👑'}{!isMobile && ' 관리자'}
