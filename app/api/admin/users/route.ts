@@ -42,10 +42,14 @@ export async function POST(req: NextRequest) {
 
   if (linkOnly) {
     // 이메일 발송 없이 초대 링크만 생성
+    const origin = req.headers.get('origin') || 'https://sales-tracker-5a2h.vercel.app'
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'invite',
       email,
-      options: { data: { name, role: role || 'member' } },
+      options: {
+        data: { name, role: role || 'member' },
+        redirectTo: `${origin}/reset-password`,
+      },
     })
     if (linkError) return NextResponse.json({ error: linkError.message }, { status: 400 })
 
