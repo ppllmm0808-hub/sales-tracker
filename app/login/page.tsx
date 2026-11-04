@@ -32,7 +32,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     })
-    if (error) { setError('이메일 발송에 실패했습니다.'); setLoading(false); return }
+    if (error) { setError(`이메일 발송 실패: ${error.message}`); setLoading(false); return }
     setResetSent(true)
     setLoading(false)
   }
