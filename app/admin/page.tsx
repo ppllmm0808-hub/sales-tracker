@@ -575,9 +575,16 @@ export default function AdminPage() {
 
         {/* 탭 */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any, flexWrap: 'nowrap', paddingBottom: 2 }}>
-          {([['list', isMobile ? '👥' : '👥 팀원 현황'],['map', isMobile ? '🗺️' : '🗺️ 이동 경로'],['report', isMobile ? '📊' : '📊 월간 리포트'],['users', isMobile ? '⚙️' : '⚙️ 계정 관리'],['export', isMobile ? '📥' : '📥 내보내기']] as const).map(([m, label]) => (
-            <button key={m} onClick={() => { setViewMode(m); setUserMsg('') }} style={{ padding: isMobile ? '7px 12px' : '7px 18px', borderRadius: 8, fontSize: isMobile ? 12 : 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === m ? '#0f172a' : '#f1f5f9', color: viewMode === m ? '#fff' : '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>{label}</button>
-          ))}
+          {(['list','map','report','users','export'] as const).map((m) => {
+            const tabs = { list: ['👥','팀원'], map: ['🗺️','경로'], report: ['📊','리포트'], users: ['⚙️','계정'], export: ['📥','내보내기'] }
+            const fullLabels = { list: '👥 팀원 현황', map: '🗺️ 이동 경로', report: '📊 월간 리포트', users: '⚙️ 계정 관리', export: '📥 내보내기' }
+            return (
+              <button key={m} onClick={() => { setViewMode(m); setUserMsg('') }}
+                style={{ padding: isMobile ? '6px 10px' : '7px 18px', borderRadius: 8, fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: viewMode === m ? '#0f172a' : '#f1f5f9', color: viewMode === m ? '#fff' : '#64748b', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, lineHeight: 1.2 }}>
+                {isMobile ? (<><span style={{ fontSize: 16 }}>{tabs[m][0]}</span><span>{tabs[m][1]}</span></>) : fullLabels[m]}
+              </button>
+            )
+          })}
         </div>
 
         {/* 월간 리포트 탭 */}
