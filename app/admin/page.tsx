@@ -400,6 +400,26 @@ export default function AdminPage() {
     setUserLoading(false)
   }
 
+  async function handleCreateLink() {
+    if (!userForm.email) { setUserMsg('❌ 이메일을 입력하세요'); return }
+    setUserLoading(true); setUserMsg('')
+    const token = await getToken()
+    const res = await fetch('/api/admin/users', {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...userForm, linkOnly: true }),
+    })
+    const data = await res.json()
+    if (res.ok && data.inviteLink) {
+      setInviteLink(data.inviteLink)
+      setUserForm({ email: '', password: '', name: '', role: 'member' })
+      await loadUsers(token)
+      setUserMsg('✅ 링크 생성 완료! 아래 링크를 카톡으로 전달하세요.')
+    } else {
+      setUserMsg(`❌ ${data.error}`)
+    }
+    setUserLoading(false)
+  }
+
   async function handleUpdateUser(e: React.FormEvent) {
     e.preventDefault()
     if (!editUser) return
@@ -639,10 +659,24 @@ export default function AdminPage() {
                   </select>
                 </label>
                 {userMsg && <p style={{ fontSize: 13, color: userMsg.startsWith('✅') ? '#059669' : '#dc2626' }}>{userMsg}</p>}
-                <button type="submit" disabled={userLoading} style={{ background: '#0f172a', border: 'none', borderRadius: 10, padding: '11px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', marginTop: 4 }}>
-                  {userLoading ? '처리 중...' : '📧 초대 메일 발송'}
+                <button type="button" onClick={handleCreateLink} disabled={userLoading} style={{ background: '#f59e0b', border: 'none', borderRadius: 10, padding: '12px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                  {userLoading ? '처리 중...' : '🔗 카톡 초대 링크 생성'}
+                </button>
+                <button type="submit" disabled={userLoading} style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                  {userLoading ? '처리 중...' : '📧 메일 발송 (회사메일 차단될 수 있음)'}
                 </button>
               </form>
+              {inviteLink && (
+                <div style={{ marginTop: 12, padding: 14, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 8 }}>📲 아래 링크를 카톡으로 전달하세요 (24시간 유효)</div>
+                  <div style={{ fontSize: 11, color: '#78350f', background: '#fff', border: '1px solid #fcd34d', borderRadius: 8, padding: '8px 10px', wordBreak: 'break-all', marginBottom: 8 }}>
+                    {inviteLink}
+                  </div>
+                  <button onClick={() => { navigator.clipboard.writeText(inviteLink); setUserMsg('✅ 링크 복사됨! 카톡에 붙여넣기 하세요.'); }} style={{ background: '#f59e0b', border: 'none', borderRadius: 8, padding: '8px 16px', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', width: '100%' }}>
+                    📋 링크 복사
+                  </button>
+                </div>
+              )}
               {/* 앱 주소 공유 */}
               <div style={{ marginTop: 16, padding: 16, background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 12 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 8 }}>📲 앱 주소 카톡으로 공유</div>
