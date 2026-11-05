@@ -109,10 +109,17 @@ export default function ClaimsStatsPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, sans-serif' }}>
       {/* 헤더 */}
-      <header style={{ background: '#dc2626', color: '#fff', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
+      <header className="no-print" style={{ background: '#dc2626', color: '#fff', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
         <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 20, padding: '0 4px', lineHeight: 1 }}>‹</button>
         <span style={{ fontWeight: 700, fontSize: 15, flex: 1 }}>📊 클레임 대시보드</span>
+        <button onClick={() => window.print()} style={{ background: '#fff', border: 'none', borderRadius: 7, padding: '5px 12px', color: '#dc2626', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>🖨️ PDF 저장</button>
       </header>
+
+      {/* 인쇄용 타이틀 */}
+      <div className="print-only" style={{ display: 'none', textAlign: 'center', padding: '20px 0 8px', fontWeight: 800, fontSize: 20, color: '#dc2626' }}>
+        클레임 대시보드
+        <div style={{ fontSize: 12, color: '#64748b', fontWeight: 400, marginTop: 4 }}>출력일: {new Date().toLocaleDateString('ko-KR')}</div>
+      </div>
 
       <main style={{ maxWidth: 760, margin: '0 auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -184,6 +191,16 @@ export default function ClaimsStatsPage() {
         )}
 
       </main>
+
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          body { margin: 0; background: #fff; }
+          @page { margin: 12mm; size: A4; }
+          header { position: static !important; }
+        }
+      `}</style>
     </div>
   )
 }
