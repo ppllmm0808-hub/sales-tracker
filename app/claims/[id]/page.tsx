@@ -124,16 +124,23 @@ export default function ClaimDetailPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true); setMsg('')
+    const hasAction = editForm.action_taken?.trim()
+
+    // 조치내용 있으면 완료, 없으면 처리중(완료였을 때만 되돌림)
+    const autoStatus = hasAction
+      ? '완료'
+      : (claim?.status === '완료' ? '처리중' : claim?.status)
+
     const res = await fetch(`/api/claims/${id}`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(editForm),
+      body: JSON.stringify({ ...editForm, status: autoStatus }),
     })
     if (res.ok) {
       const updated = await res.json()
       setClaim(updated)
       setEditing(false)
-      setMsg('✅ 저장됐습니다')
+      setMsg(hasAction ? '✅ 저장됐습니다 — 완료 처리됐습니다' : '✅ 저장됐습니다')
     } else {
       const d = await res.json()
       setMsg(`❌ ${d.error}`)
@@ -267,13 +274,30 @@ export default function ClaimDetailPage() {
               {['접수', '처리중', '완료'].map(s => {
                 const st = STATUS_STYLE[s]
                 const active = claim.status === s
+                // 처리중: 버튼 클릭 불가 (공유 시 자동)
+                // 완료: 조치내용 없으면 불가
+                // 접수 복원: 관리자만
+                const blocked =
+                  s === '처리중' ||
+                  (s === '완료' && !claim.action_taken) ||
+                  (s === '접수' && !isAdmin)
+                const disabledBtn = saving || active || blocked
                 return (
-                  <button key={s} onClick={() => updateStatus(s)} disabled={saving || active}
-                    style={{ flex: 1, padding: '10px 8px', borderRadius: 10, border: `2px solid ${active ? st.text : '#e2e8f0'}`, background: active ? st.bg : '#f8fafc', color: active ? st.text : '#94a3b8', fontWeight: 700, fontSize: 13, cursor: active ? 'default' : 'pointer', transition: 'all 0.15s' }}>
+                  <button key={s} onClick={() => !disabledBtn && updateStatus(s)}
+                    disabled={disabledBtn}
+                    title={
+                      s === '처리중' ? '공유 버튼으로 자동 변경됩니다' :
+                      s === '완료' && !claim.action_taken ? '조치 내용을 먼저 입력하세요' :
+                      s === '접수' && !isAdmin ? '관리자만 가능합니다' : ''
+                    }
+                    style={{ flex: 1, padding: '10px 8px', borderRadius: 10, border: `2px solid ${active ? st.text : '#e2e8f0'}`, background: active ? st.bg : blocked && !active ? '#f8fafc' : '#f8fafc', color: active ? st.text : blocked ? '#cbd5e1' : '#94a3b8', fontWeight: 700, fontSize: 13, cursor: disabledBtn ? 'not-allowed' : 'pointer', transition: 'all 0.15s', opacity: blocked && !active ? 0.5 : 1 }}>
                     {st.icon} {s}
                   </button>
                 )
               })}
+            </div>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
+              💡 조치 내용 저장 시 자동으로 완료 처리됩니다
             </div>
           </div>
         )}
@@ -303,7 +327,11 @@ export default function ClaimDetailPage() {
                   {ACTION_TYPES.map(a => <option key={a}>{a}</option>)}
                 </select>
               </label>
-              <label style={lbl}>조치 내용<textarea value={editForm.action_taken} onChange={e => setEditForm(p => ({ ...p, action_taken: e.target.value }))} style={{ ...inp, height: 70, resize: 'vertical' }} placeholder="교환/반품/수리 등 처리 상세 내용" /></label>
+              <label style={lbl}>
+                조치 내용
+                <span style={{ fontSize: 10, color: '#16a34a', fontWeight: 400, marginLeft: 6 }}>✓ 입력 후 저장하면 자동으로 완료 처리</span>
+                <textarea value={editForm.action_taken} onChange={e => setEditForm(p => ({ ...p, action_taken: e.target.value }))} style={{ ...inp, height: 70, resize: 'vertical' }} placeholder="교환/반품/수리 등 처리 상세 내용을 입력하면 완료로 변경됩니다" />
+              </label>
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                 <button type="button" onClick={() => setEditing(false)} style={{ flex: 1, background: '#f1f5f9', border: 'none', borderRadius: 8, padding: 11, color: '#475569', cursor: 'pointer', fontSize: 14 }}>취소</button>
                 <button type="submit" disabled={saving} style={{ flex: 2, background: '#dc2626', border: 'none', borderRadius: 8, padding: 11, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>{saving ? '저장 중...' : '저장'}</button>
