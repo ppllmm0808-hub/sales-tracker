@@ -380,6 +380,8 @@ export default function ClaimDetailPage() {
               <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginBottom: 6 }}>조치 내용</div>
               {claim.action_taken ? (
                 <div style={{ fontSize: 14, color: '#1e293b', lineHeight: 1.7, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '12px 14px', whiteSpace: 'pre-wrap' }}>{claim.action_taken}</div>
+              ) : claim.status === '완료' ? (
+                <div style={{ fontSize: 14, color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>(미입력)</div>
               ) : canEdit ? (
                 <button onClick={() => setEditing(true)} style={{ width: '100%', background: '#f0fdf4', border: '1px dashed #86efac', borderRadius: 10, padding: '12px', color: '#16a34a', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
                   + 조치 내용 입력

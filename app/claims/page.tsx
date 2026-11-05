@@ -119,6 +119,11 @@ export default function ClaimsPage() {
       { wch: 4 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 15 },
       { wch: 8 }, { wch: 12 }, { wch: 40 }, { wch: 30 }, { wch: 8 }, { wch: 14 }, { wch: 12 },
     ]
+    // 목록 → 상세 하이퍼링크 (거래처 열 C, 각 행에서 상세 시트 해당 행으로)
+    for (let i = 0; i < monthClaims.length; i++) {
+      const cellRef = XLSX.utils.encode_cell({ r: i + 1, c: 2 })
+      if (ws1[cellRef]) ws1[cellRef].l = { Target: `#상세!A${i + 2}` }
+    }
     XLSX.utils.book_append_sheet(wb, ws1, '목록')
 
     // ── 상세 시트 (1행 per claim 플랫 테이블) ──
@@ -142,6 +147,11 @@ export default function ClaimsPage() {
       { wch: 4 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 15 },
       { wch: 8 }, { wch: 12 }, { wch: 45 }, { wch: 35 }, { wch: 8 }, { wch: 14 }, { wch: 12 },
     ]
+    // 상세 → 목록 하이퍼링크 (거래처 열 C, 각 행에서 목록 시트 해당 행으로)
+    for (let i = 0; i < monthClaims.length; i++) {
+      const cellRef = XLSX.utils.encode_cell({ r: i + 1, c: 2 })
+      if (ws2[cellRef]) ws2[cellRef].l = { Target: `#목록!A${i + 2}` }
+    }
     XLSX.utils.book_append_sheet(wb, ws2, '상세')
 
     // ── 월별현황 시트 ──
