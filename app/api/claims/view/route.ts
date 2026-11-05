@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const admin = getAdmin()
   const { data: claim } = await admin
     .from('claims')
-    .select('*, profiles(name, email)')
+    .select('*')
     .eq('share_token', shareToken)
     .single()
 
@@ -32,5 +32,9 @@ export async function GET(req: NextRequest) {
     claim.status = '처리중'
   }
 
-  return NextResponse.json(claim)
+  // 등록자 프로필 별도 조회
+  const { data: authorProfile } = await admin
+    .from('profiles').select('name, email').eq('id', claim.user_id).single()
+
+  return NextResponse.json({ ...claim, profiles: authorProfile ?? null })
 }

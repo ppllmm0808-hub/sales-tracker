@@ -21,23 +21,28 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const user = await getUser(token)
   if (!user) return NextResponse.json({ error: '인증 실패' }, { status: 401 })
 
-  const { data, error } = await getAdmin()
+  const admin = getAdmin()
+  const { data: claim, error } = await admin
     .from('claims')
-    .select('*, profiles(name, email)')
+    .select('*')
     .eq('id', params.id)
     .single()
 
-  if (error || !data) return NextResponse.json({ error: '클레임을 찾을 수 없습니다' }, { status: 404 })
+  if (error || !claim) return NextResponse.json({ error: '클레임을 찾을 수 없습니다' }, { status: 404 })
 
-  const { data: profile } = await getAdmin()
+  const { data: profile } = await admin
     .from('profiles').select('role').eq('id', user.id).single()
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner'
 
-  if (data.user_id !== user.id && !isAdmin) {
+  if (claim.user_id !== user.id && !isAdmin) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
-  return NextResponse.json(data)
+  // 등록자 프로필 별도 조회
+  const { data: authorProfile } = await admin
+    .from('profiles').select('name, email').eq('id', claim.user_id).single()
+
+  return NextResponse.json({ ...claim, profiles: authorProfile ?? null })
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
