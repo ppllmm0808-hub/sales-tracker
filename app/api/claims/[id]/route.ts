@@ -68,6 +68,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.category !== undefined) updates.category = body.category
   if (body.content !== undefined) updates.content = body.content
   if (body.claim_date !== undefined) updates.claim_date = body.claim_date
+  if (body.action_type !== undefined) updates.action_type = body.action_type
   if (body.action_taken !== undefined) updates.action_taken = body.action_taken
   if (body.status !== undefined) {
     updates.status = body.status

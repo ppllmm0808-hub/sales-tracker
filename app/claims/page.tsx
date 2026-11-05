@@ -197,34 +197,28 @@ export default function ClaimsPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      {/* Header */}
-      <header style={{ background: '#dc2626', color: '#fff', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
-        {/* 1행: 타이틀 + 버튼 */}
-        <div style={{ padding: isMobile ? '10px 14px' : '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12 }}>
-            <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: '6px 10px', fontSize: 20, flexShrink: 0 }}>📋</div>
-            <div style={{ fontWeight: 700, fontSize: isMobile ? 14 : 16 }}>고객 클레임 대장</div>
-          </div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-            <button onClick={() => { setShowForm(true); setMsg('') }} style={{ background: '#fff', border: 'none', borderRadius: 8, padding: isMobile ? '5px 12px' : '6px 16px', color: '#dc2626', cursor: 'pointer', fontSize: isMobile ? 12 : 13, fontWeight: 700, whiteSpace: 'nowrap' }}>+ 등록</button>
-            <button onClick={() => setShowExport(true)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>📊 엑셀</button>
-            <button onClick={() => router.push('/dashboard')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>일지</button>
-            {isAdmin && (
-              <button onClick={() => router.push('/admin')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>관리자</button>
-            )}
-          </div>
-        </div>
-        {/* 2행: 상태 필터 탭 */}
-        <div style={{ display: 'flex', gap: 0, overflowX: 'auto', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+      {/* Header — 1줄 */}
+      <header style={{ background: '#dc2626', color: '#fff', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 6px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', padding: '0 10px', gap: 6, height: 46 }}>
+        <span style={{ fontSize: 15, flexShrink: 0 }}>📋</span>
+        <span style={{ fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', marginRight: 2 }}>클레임</span>
+        {/* 상태 필터 탭 */}
+        <div style={{ display: 'flex', flex: 1, overflowX: 'auto', gap: 0, alignSelf: 'stretch', alignItems: 'center' }}>
           {STATUS_LIST.map(s => {
             const cnt = s === '전체' ? claims.length : claims.filter(c => c.status === s).length
             const active = statusFilter === s
             return (
-              <button key={s} onClick={() => setStatusFilter(s)} style={{ flex: 1, padding: isMobile ? '8px 4px' : '10px 20px', border: 'none', background: active ? 'rgba(255,255,255,0.2)' : 'transparent', color: active ? '#fff' : 'rgba(255,255,255,0.6)', fontWeight: active ? 700 : 500, fontSize: isMobile ? 12 : 13, cursor: 'pointer', whiteSpace: 'nowrap', borderBottom: active ? '2px solid #fff' : '2px solid transparent', transition: 'all 0.15s' }}>
-                {s}{cnt > 0 && <span style={{ marginLeft: 4, background: active ? '#fff' : 'rgba(255,255,255,0.3)', color: active ? '#dc2626' : '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>{cnt}</span>}
+              <button key={s} onClick={() => setStatusFilter(s)} style={{ padding: '0 8px', height: '100%', border: 'none', background: 'transparent', color: active ? '#fff' : 'rgba(255,255,255,0.6)', fontWeight: active ? 700 : 400, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', borderBottom: active ? '2px solid #fff' : '2px solid transparent', flexShrink: 0 }}>
+                {s}{cnt > 0 && <span style={{ marginLeft: 3, background: active ? '#fff' : 'rgba(255,255,255,0.25)', color: active ? '#dc2626' : '#fff', borderRadius: 8, padding: '1px 5px', fontSize: 10, fontWeight: 700 }}>{cnt}</span>}
               </button>
             )
           })}
+        </div>
+        {/* 버튼 */}
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          <button onClick={() => { setShowForm(true); setMsg('') }} style={{ background: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', color: '#dc2626', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>+등록</button>
+          <button onClick={() => setShowExport(true)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 8px', color: '#fff', cursor: 'pointer', fontSize: 12 }}>📊</button>
+          <button onClick={() => router.push('/dashboard')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 8px', color: '#fff', cursor: 'pointer', fontSize: 12 }}>일지</button>
+          {isAdmin && <button onClick={() => router.push('/admin')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 8px', color: '#fff', cursor: 'pointer', fontSize: 12 }}>관리자</button>}
         </div>
       </header>
 
@@ -257,28 +251,13 @@ export default function ClaimsPage() {
                 return (
                   <div key={claim.id}
                     onClick={() => router.push(`/claims/${claim.id}`)}
-                    style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, transition: 'box-shadow 0.15s' }}
-                    onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)')}
-                    onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+                    style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
                   >
-                    {/* 왼쪽: 날짜 + 업체명 + 내용 */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 3 }}>
-                        {claim.category && <span style={{ background: cs.bg, color: cs.text, borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>{claim.category}</span>}
-                        {isAdmin && claim.profiles && <span style={{ marginLeft: 6 }}>{claim.profiles.name || claim.profiles.email}</span>}
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{claim.company}</div>
-                      <div style={{ fontSize: 12, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{claim.content}</div>
-                    </div>
-
-                    {/* 오른쪽: 상태 뱃지 + 화살표 */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-                      <span style={{ background: ss.bg, color: ss.text, borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{ss.icon} {claim.status}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {claim.photos?.length > 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>📷{claim.photos.length}</span>}
-                        <span style={{ color: '#94a3b8', fontSize: 22, fontWeight: 300 }}>›</span>
-                      </div>
-                    </div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{claim.company}</div>
+                    <span style={{ background: cs.bg, color: cs.text, borderRadius: 4, padding: '2px 6px', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{claim.category}</span>
+                    {claim.photos?.length > 0 && <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>📷{claim.photos.length}</span>}
+                    <span style={{ background: ss.bg, color: ss.text, borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>{ss.icon} {claim.status}</span>
+                    <span style={{ color: '#cbd5e1', fontSize: 18, flexShrink: 0 }}>›</span>
                   </div>
                 )
               })}

@@ -26,18 +26,28 @@ export async function GET(req: NextRequest) {
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner'
 
-  let query = getAdmin()
+  const admin = getAdmin()
+  let claimsQuery = admin
     .from('claims')
-    .select('*, profiles(name, email)')
+    .select('*')
     .order('claim_date', { ascending: false })
     .order('created_at', { ascending: false })
 
-  if (!isAdmin) query = query.eq('user_id', user.id)
+  if (!isAdmin) claimsQuery = claimsQuery.eq('user_id', user.id)
 
-  const { data, error } = await query
+  const { data: claims, error } = await claimsQuery
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!claims || claims.length === 0) return NextResponse.json([])
 
-  return NextResponse.json(data ?? [])
+  // 프로필 별도 조회 후 병합 (외래키 미설정 환경 대응)
+  const userIds = [...new Set(claims.map((c: any) => c.user_id))]
+  const { data: profiles } = await admin
+    .from('profiles').select('id, name, email').in('id', userIds)
+  const profileMap: Record<string, any> = {}
+  for (const p of profiles ?? []) profileMap[p.id] = p
+
+  const result = claims.map((c: any) => ({ ...c, profiles: profileMap[c.user_id] ?? null }))
+  return NextResponse.json(result)
 }
 
 export async function POST(req: NextRequest) {
