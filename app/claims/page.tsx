@@ -147,8 +147,24 @@ export default function ClaimsPage() {
         ])
       }
     }
-    const ws3 = XLSX.utils.aoa_to_sheet([summaryHeader, ...summaryData])
-    ws3['!cols'] = [{ wch: 10 }, { wch: 8 }, { wch: 6 }, { wch: 7 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }]
+    // 월별 텍스트 바 차트 (데이터 아래에 추가)
+    const maxTotal = Math.max(...summaryData.map(r => r[1] as number), 1)
+    const BAR_WIDTH = 20
+    const chartRows: (string | number)[][] = [
+      [''],
+      ['── 월별 클레임 건수 차트 ──'],
+      ['월', '건수', '그래프 (■=완료  □=미완료)'],
+    ]
+    for (const row of summaryData) {
+      const total = row[1] as number
+      const done = row[4] as number
+      const filled = Math.round((total / maxTotal) * BAR_WIDTH)
+      const doneFilled = Math.round((done / maxTotal) * BAR_WIDTH)
+      const bar = '■'.repeat(doneFilled) + '□'.repeat(filled - doneFilled) + '·'.repeat(BAR_WIDTH - filled)
+      chartRows.push([row[0], total, bar])
+    }
+    const ws3 = XLSX.utils.aoa_to_sheet([summaryHeader, ...summaryData, ...chartRows])
+    ws3['!cols'] = [{ wch: 10 }, { wch: 8 }, { wch: 7 }, { wch: 7 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }]
     XLSX.utils.book_append_sheet(wb, ws3, '월별현황')
 
     XLSX.writeFile(wb, `클레임_${exportYear}년${pad(exportMonth)}월.xlsx`)
