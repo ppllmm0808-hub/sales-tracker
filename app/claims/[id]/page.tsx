@@ -385,8 +385,8 @@ export default function ClaimDetailPage() {
           )}
         </div>
 
-        {/* 삭제 버튼 */}
-        {canEdit && (
+        {/* 삭제 버튼 — 관리자/시스템관리자만 표시 */}
+        {isAdmin && (
           <button onClick={handleDelete} disabled={deleting}
             style={{ background: 'none', border: '1px solid #fca5a5', borderRadius: 10, padding: 12, color: '#dc2626', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
             {deleting ? '삭제 중...' : '🗑️ 이 클레임 삭제'}

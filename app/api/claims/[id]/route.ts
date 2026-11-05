@@ -98,8 +98,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     .from('profiles').select('role').eq('id', user.id).single()
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner'
 
-  if (existing.user_id !== user.id && !isAdmin) {
-    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+  if (!isAdmin) {
+    return NextResponse.json({ error: '관리자만 삭제할 수 있습니다' }, { status: 403 })
   }
 
   await getAdmin().from('claims').delete().eq('id', params.id)
