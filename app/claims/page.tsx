@@ -263,21 +263,32 @@ export default function ClaimsPage() {
         {/* 버튼 */}
         <div style={{ display: 'flex', gap: 4, flexShrink: 0, position: 'relative' }}>
           <button onClick={() => { setShowForm(true); setMsg(''); setShowMenu(false) }} style={{ background: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', color: '#dc2626', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>+등록</button>
-          <button onClick={() => setShowMenu(v => !v)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>⋯</button>
-          {showMenu && (
+          {isMobile ? (
             <>
-              <div onClick={() => setShowMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
-              <div style={{ position: 'absolute', top: 38, right: 0, background: '#fff', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.18)', zIndex: 200, minWidth: 140, overflow: 'hidden' }}>
-                <button onClick={() => { setShowMenu(false); router.push('/claims/stats') }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '11px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#1e293b' }}>📊 대시보드</button>
-                <div style={{ height: 1, background: '#f1f5f9', margin: '0 10px' }} />
-                <button onClick={() => { setShowMenu(false); setShowExport(true) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '11px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#1e293b' }}>📥 엑셀 다운로드</button>
-                <div style={{ height: 1, background: '#f1f5f9', margin: '0 10px' }} />
-                <button onClick={() => { setShowMenu(false); router.push('/dashboard') }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '11px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#1e293b' }}>📒 영업일지</button>
-                {isAdmin && <>
-                  <div style={{ height: 1, background: '#f1f5f9', margin: '0 10px' }} />
-                  <button onClick={() => { setShowMenu(false); router.push('/admin') }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '11px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#dc2626', fontWeight: 600 }}>⚙️ 관리자</button>
-                </>}
-              </div>
+              <button onClick={() => setShowMenu(v => !v)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>⋯</button>
+              {showMenu && (
+                <>
+                  <div onClick={() => setShowMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 199 }} />
+                  <div style={{ position: 'absolute', top: 38, right: 0, background: '#fff', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.18)', zIndex: 200, minWidth: 140, overflow: 'hidden' }}>
+                    <button onClick={() => { setShowMenu(false); router.push('/claims/stats') }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '11px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#1e293b' }}>📊 대시보드</button>
+                    <div style={{ height: 1, background: '#f1f5f9', margin: '0 10px' }} />
+                    <button onClick={() => { setShowMenu(false); setShowExport(true) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '11px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#1e293b' }}>📥 엑셀 다운로드</button>
+                    <div style={{ height: 1, background: '#f1f5f9', margin: '0 10px' }} />
+                    <button onClick={() => { setShowMenu(false); router.push('/dashboard') }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '11px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#1e293b' }}>📒 영업일지</button>
+                    {isAdmin && <>
+                      <div style={{ height: 1, background: '#f1f5f9', margin: '0 10px' }} />
+                      <button onClick={() => { setShowMenu(false); router.push('/admin') }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '11px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#dc2626', fontWeight: 600 }}>⚙️ 관리자</button>
+                    </>}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <button onClick={() => router.push('/claims/stats')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 8px', color: '#fff', cursor: 'pointer', fontSize: 12 }}>📊</button>
+              <button onClick={() => setShowExport(true)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 8px', color: '#fff', cursor: 'pointer', fontSize: 12 }}>📥</button>
+              <button onClick={() => router.push('/dashboard')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 8px', color: '#fff', cursor: 'pointer', fontSize: 12 }}>일지</button>
+              {isAdmin && <button onClick={() => router.push('/admin')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 8px', color: '#fff', cursor: 'pointer', fontSize: 12 }}>관리자</button>}
             </>
           )}
         </div>
