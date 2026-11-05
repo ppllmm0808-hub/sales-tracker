@@ -125,42 +125,36 @@ export default function ClaimsPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       {/* Header */}
-      <header style={{ background: '#dc2626', color: '#fff', padding: isMobile ? '10px 14px' : '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12 }}>
-          <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: '6px 10px', fontSize: 20, flexShrink: 0 }}>📋</div>
-          <div>
+      <header style={{ background: '#dc2626', color: '#fff', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+        {/* 1행: 타이틀 + 버튼 */}
+        <div style={{ padding: isMobile ? '10px 14px' : '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12 }}>
+            <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: '6px 10px', fontSize: 20, flexShrink: 0 }}>📋</div>
             <div style={{ fontWeight: 700, fontSize: isMobile ? 14 : 16 }}>고객 클레임 대장</div>
-            {!isMobile && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>클레임 등록 · 처리 · 완료 관리</div>}
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+            <button onClick={() => { setShowForm(true); setMsg('') }} style={{ background: '#fff', border: 'none', borderRadius: 8, padding: isMobile ? '5px 12px' : '6px 16px', color: '#dc2626', cursor: 'pointer', fontSize: isMobile ? 12 : 13, fontWeight: 700, whiteSpace: 'nowrap' }}>+ 등록</button>
+            <button onClick={() => router.push('/dashboard')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>일지</button>
+            {isAdmin && (
+              <button onClick={() => router.push('/admin')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>관리자</button>
+            )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          {pendingCount > 0 && (
-            <span style={{ background: '#fff', color: '#dc2626', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 800 }}>
-              미처리 {pendingCount}건
-            </span>
-          )}
-          <button onClick={() => router.push('/dashboard')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>일지</button>
-          {isAdmin && (
-            <button onClick={() => router.push('/admin')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>관리자</button>
-          )}
+        {/* 2행: 상태 필터 탭 */}
+        <div style={{ display: 'flex', gap: 0, overflowX: 'auto', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+          {STATUS_LIST.map(s => {
+            const cnt = s === '전체' ? claims.length : claims.filter(c => c.status === s).length
+            const active = statusFilter === s
+            return (
+              <button key={s} onClick={() => setStatusFilter(s)} style={{ flex: 1, padding: isMobile ? '8px 4px' : '10px 20px', border: 'none', background: active ? 'rgba(255,255,255,0.2)' : 'transparent', color: active ? '#fff' : 'rgba(255,255,255,0.6)', fontWeight: active ? 700 : 500, fontSize: isMobile ? 12 : 13, cursor: 'pointer', whiteSpace: 'nowrap', borderBottom: active ? '2px solid #fff' : '2px solid transparent', transition: 'all 0.15s' }}>
+                {s}{cnt > 0 && <span style={{ marginLeft: 4, background: active ? '#fff' : 'rgba(255,255,255,0.3)', color: active ? '#dc2626' : '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>{cnt}</span>}
+              </button>
+            )
+          })}
         </div>
       </header>
 
       <main style={{ maxWidth: 760, margin: '0 auto', padding: isMobile ? '16px 12px' : '24px 16px' }}>
-        {/* 상단 액션 바 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 10 }}>
-          {/* 상태 필터 */}
-          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', flexShrink: 1 }}>
-            {STATUS_LIST.map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)} style={{ padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: statusFilter === s ? '#dc2626' : '#f1f5f9', color: statusFilter === s ? '#fff' : '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                {s}{s !== '전체' && claims.filter(c => c.status === s).length > 0 && ` ${claims.filter(c => c.status === s).length}`}
-              </button>
-            ))}
-          </div>
-          <button onClick={() => { setShowForm(true); setMsg('') }} style={{ background: '#dc2626', border: 'none', borderRadius: 10, padding: isMobile ? '8px 14px' : '8px 20px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap', flexShrink: 0 }}>
-            + 클레임 등록
-          </button>
-        </div>
 
         {msg && !showForm && (
           <div style={{ background: msg.startsWith('✅') ? '#f0fdf4' : '#fef2f2', border: `1px solid ${msg.startsWith('✅') ? '#86efac' : '#fca5a5'}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, color: msg.startsWith('✅') ? '#15803d' : '#dc2626', marginBottom: 14 }}>{msg}</div>
