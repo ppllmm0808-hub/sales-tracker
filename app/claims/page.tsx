@@ -115,39 +115,71 @@ export default function ClaimsPage() {
     ])
     const ws1 = XLSX.utils.aoa_to_sheet([listHeader, ...listData])
 
-    // 목록 → 상세 시트 하이퍼링크 (거래처 열 C)
-    const detailRowSize = 11  // 상세 시트에서 클레임 1건당 행 수
-    for (let i = 0; i < monthClaims.length; i++) {
-      const cellRef = XLSX.utils.encode_cell({ r: i + 1, c: 2 })
-      if (ws1[cellRef]) ws1[cellRef].l = { Target: `#상세!A${i * detailRowSize + 1}` }
-    }
     ws1['!cols'] = [
       { wch: 4 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 15 },
       { wch: 8 }, { wch: 12 }, { wch: 40 }, { wch: 30 }, { wch: 8 }, { wch: 14 }, { wch: 12 },
     ]
+    // 목록 → 상세 하이퍼링크 (거래처 열 C, 각 행에서 상세 시트 해당 행으로)
+    for (let i = 0; i < monthClaims.length; i++) {
+      const cellRef = XLSX.utils.encode_cell({ r: i + 1, c: 2 })
+      if (ws1[cellRef]) ws1[cellRef].l = { Target: `#상세!A${i + 2}` }
+    }
     XLSX.utils.book_append_sheet(wb, ws1, '목록')
 
-    // ── 상세 시트 ──
-    const detailRows: (string | number)[][] = []
+    // ── 상세 시트 (1행 per claim 플랫 테이블) ──
+    const detailHeader = ['No', '날짜', '거래처', '담당자', '연락처', '클레임 유형', '처리 유형', '클레임 내용', '조치 내용', '상태', '완료일시', '등록자']
+    const detailData = monthClaims.map((c, i) => [
+      i + 1,
+      c.claim_date,
+      c.company,
+      c.contact || '',
+      c.phone || '',
+      c.category,
+      c.action_type || '',
+      c.content,
+      c.action_taken || '',
+      c.status,
+      c.resolved_at ? new Date(c.resolved_at).toLocaleDateString('ko-KR') : '',
+      c.profiles?.name || c.profiles?.email || '',
+    ])
+    const ws2 = XLSX.utils.aoa_to_sheet([detailHeader, ...detailData])
+    ws2['!cols'] = [
+      { wch: 4 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 15 },
+      { wch: 8 }, { wch: 12 }, { wch: 45 }, { wch: 35 }, { wch: 8 }, { wch: 14 }, { wch: 12 },
+    ]
+    // 상세 → 목록 하이퍼링크 (거래처 열 C, 각 행에서 목록 시트 해당 행으로)
     for (let i = 0; i < monthClaims.length; i++) {
-      const c = monthClaims[i]
-      detailRows.push([`[${i + 1}] ${c.company}  (${c.claim_date})`])
-      detailRows.push(['거래처', c.company, '날짜', c.claim_date])
-      detailRows.push(['담당자', c.contact || '-', '연락처', c.phone || '-'])
-      detailRows.push(['클레임 유형', c.category, '처리 유형', c.action_type || '-'])
-      detailRows.push(['상태', c.status, '완료일시', c.resolved_at ? new Date(c.resolved_at).toLocaleDateString('ko-KR') : '-'])
-      detailRows.push(['등록자', c.profiles?.name || c.profiles?.email || '-', '', ''])
-      detailRows.push(['클레임 내용', c.content, '', ''])
-      detailRows.push(['조치 내용', c.action_taken || '-', '', ''])
-      if (c.photos?.length > 0) {
-        detailRows.push(['사진 URL', c.photos.join(', '), '', ''])
-      }
-      detailRows.push([''])
-      detailRows.push([''])
+      const cellRef = XLSX.utils.encode_cell({ r: i + 1, c: 2 })
+      if (ws2[cellRef]) ws2[cellRef].l = { Target: `#목록!A${i + 2}` }
     }
-    const ws2 = XLSX.utils.aoa_to_sheet(detailRows)
-    ws2['!cols'] = [{ wch: 12 }, { wch: 45 }, { wch: 12 }, { wch: 20 }]
     XLSX.utils.book_append_sheet(wb, ws2, '상세')
+
+    // ── 월별현황 시트 ──
+    const allYears = [...new Set(claims.map(c => c.claim_date.substring(0, 4)))].sort()
+    const summaryHeader = ['월', '총건수', '접수', '처리중', '완료', '불량', '배송', 'AS', '계약', '기타']
+    const summaryData: (string | number)[][] = []
+    for (const yr of allYears) {
+      for (let m = 1; m <= 12; m++) {
+        const key = `${yr}-${pad(m)}`
+        const mc = claims.filter(c => c.claim_date.startsWith(key))
+        if (mc.length === 0) continue
+        summaryData.push([
+          `${yr}.${pad(m)}`,
+          mc.length,
+          mc.filter(c => c.status === '접수').length,
+          mc.filter(c => c.status === '처리중').length,
+          mc.filter(c => c.status === '완료').length,
+          mc.filter(c => c.category === '불량').length,
+          mc.filter(c => c.category === '배송').length,
+          mc.filter(c => c.category === 'AS').length,
+          mc.filter(c => c.category === '계약').length,
+          mc.filter(c => c.category === '기타').length,
+        ])
+      }
+    }
+    const ws3 = XLSX.utils.aoa_to_sheet([summaryHeader, ...summaryData])
+    ws3['!cols'] = [{ wch: 10 }, { wch: 8 }, { wch: 6 }, { wch: 7 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }]
+    XLSX.utils.book_append_sheet(wb, ws3, '월별현황')
 
     XLSX.writeFile(wb, `클레임_${exportYear}년${pad(exportMonth)}월.xlsx`)
     setShowExport(false)
@@ -216,7 +248,8 @@ export default function ClaimsPage() {
         {/* 버튼 */}
         <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
           <button onClick={() => { setShowForm(true); setMsg('') }} style={{ background: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', color: '#dc2626', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>+등록</button>
-          <button onClick={() => setShowExport(true)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 8px', color: '#fff', cursor: 'pointer', fontSize: 12 }}>📊</button>
+          <button onClick={() => router.push('/claims/stats')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 8px', color: '#fff', cursor: 'pointer', fontSize: 12 }}>📊</button>
+          <button onClick={() => setShowExport(true)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 8px', color: '#fff', cursor: 'pointer', fontSize: 12 }}>📥</button>
           <button onClick={() => router.push('/dashboard')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 8px', color: '#fff', cursor: 'pointer', fontSize: 12 }}>일지</button>
           {isAdmin && <button onClick={() => router.push('/admin')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6, padding: '4px 8px', color: '#fff', cursor: 'pointer', fontSize: 12 }}>관리자</button>}
         </div>

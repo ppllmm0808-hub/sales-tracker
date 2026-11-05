@@ -78,6 +78,9 @@ export default function ClaimDetailPage() {
   const [shareUrl, setShareUrl] = useState('')
   const [showShareModal, setShowShareModal] = useState(false)
   const [sharingLoading, setSharingLoading] = useState(false)
+  const [openContent, setOpenContent] = useState(true)
+  const [openAction, setOpenAction] = useState(true)
+  const [customActionType, setCustomActionType] = useState('')
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768)
@@ -100,9 +103,12 @@ export default function ClaimDetailPage() {
       if (!res.ok) { router.push('/claims'); return }
       const c = await res.json()
       setClaim(c)
+      const isCustom = c.action_type && !['교환', '반품', '협의완료', '수리', '환불', 'AS처리', '기타'].includes(c.action_type)
+      setCustomActionType(isCustom ? c.action_type : '')
       setEditForm({
         company: c.company, contact: c.contact || '', phone: c.phone || '',
-        category: c.category, content: c.content, action_type: c.action_type || '',
+        category: c.category, content: c.content,
+        action_type: isCustom ? '직접입력' : (c.action_type || ''),
         action_taken: c.action_taken || '', claim_date: c.claim_date,
       })
       setLoading(false)
@@ -131,15 +137,20 @@ export default function ClaimDetailPage() {
       ? '완료'
       : (claim?.status === '완료' ? '처리중' : claim?.status)
 
+    const finalActionType = editForm.action_type === '직접입력' ? customActionType.trim() : editForm.action_type
     const res = await fetch(`/api/claims/${id}`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...editForm, status: autoStatus }),
+      body: JSON.stringify({ ...editForm, action_type: finalActionType, status: autoStatus }),
     })
     if (res.ok) {
       const updated = await res.json()
       setClaim(updated)
       setEditing(false)
+      // 직접입력이면 editForm도 업데이트
+      if (editForm.action_type === '직접입력') {
+        setEditForm(p => ({ ...p, action_type: '직접입력' }))
+      }
       setMsg(hasAction ? '✅ 저장됐습니다 — 완료 처리됐습니다' : '✅ 저장됐습니다')
     } else {
       const d = await res.json()
@@ -325,8 +336,14 @@ export default function ClaimDetailPage() {
                 <select value={editForm.action_type} onChange={e => setEditForm(p => ({ ...p, action_type: e.target.value }))} style={inp}>
                   <option value="">선택 안 함</option>
                   {ACTION_TYPES.map(a => <option key={a}>{a}</option>)}
+                  <option value="직접입력">✏️ 직접입력</option>
                 </select>
               </label>
+              {editForm.action_type === '직접입력' && (
+                <label style={lbl}>직접 입력 내용
+                  <input value={customActionType} onChange={e => setCustomActionType(e.target.value)} placeholder="처리 유형 직접 입력" style={inp} />
+                </label>
+              )}
               <label style={lbl}>
                 조치 내용
                 <span style={{ fontSize: 10, color: '#16a34a', fontWeight: 400, marginLeft: 6 }}>✓ 입력 후 저장하면 자동으로 완료 처리</span>
@@ -342,7 +359,6 @@ export default function ClaimDetailPage() {
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ background: cs.bg, color: cs.text, borderRadius: 6, padding: '3px 12px', fontSize: 12, fontWeight: 700 }}>{claim.category}</span>
-              {claim.action_type && <span style={{ background: '#e0e7ff', color: '#4338ca', borderRadius: 6, padding: '3px 12px', fontSize: 12, fontWeight: 700 }}>🔧 {claim.action_type}</span>}
               {claim.resolved_at && <span style={{ fontSize: 12, color: '#94a3b8' }}>완료: {new Date(claim.resolved_at).toLocaleDateString('ko-KR')}</span>}
             </div>
 
@@ -371,21 +387,42 @@ export default function ClaimDetailPage() {
               )}
             </div>
 
-            <div>
-              <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginBottom: 6 }}>클레임 내용</div>
-              <div style={{ fontSize: 14, color: '#1e293b', lineHeight: 1.7, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 14px', whiteSpace: 'pre-wrap' }}>{claim.content}</div>
+            {/* 클레임 내용 — 클릭 토글 */}
+            <div style={{ border: '1px solid #fecaca', borderRadius: 10, overflow: 'hidden' }}>
+              <button onClick={() => setOpenContent(p => !p)} style={{ width: '100%', background: '#fef2f2', border: 'none', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+                <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>📋 클레임 내용</span>
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>{openContent ? '▲' : '▼'}</span>
+              </button>
+              {openContent && (
+                <div style={{ fontSize: 14, color: '#1e293b', lineHeight: 1.7, background: '#fef2f2', padding: '10px 14px', whiteSpace: 'pre-wrap', borderTop: '1px solid #fecaca' }}>{claim.content}</div>
+              )}
             </div>
 
-            {claim.action_taken ? (
-              <div>
-                <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginBottom: 6 }}>조치 내용</div>
-                <div style={{ fontSize: 14, color: '#1e293b', lineHeight: 1.7, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '12px 14px', whiteSpace: 'pre-wrap' }}>{claim.action_taken}</div>
-              </div>
-            ) : canEdit && (
-              <button onClick={() => setEditing(true)} style={{ background: '#f0fdf4', border: '1px dashed #86efac', borderRadius: 10, padding: '12px', color: '#16a34a', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
-                + 조치 내용 입력
+            {/* 조치 내용 — 클릭 토글 */}
+            <div style={{ border: `1px solid ${claim.action_taken ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: 10, overflow: 'hidden' }}>
+              <button onClick={() => setOpenAction(p => !p)} style={{ width: '100%', background: claim.action_taken ? '#f0fdf4' : '#f8fafc', border: 'none', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+                <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>
+                  🔧 조치 내용
+                  {claim.action_type && <span style={{ marginLeft: 8, background: '#e0e7ff', color: '#4338ca', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>{claim.action_type}</span>}
+                </span>
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>{openAction ? '▲' : '▼'}</span>
               </button>
-            )}
+              {openAction && (
+                <div style={{ borderTop: `1px solid ${claim.action_taken ? '#bbf7d0' : '#e2e8f0'}` }}>
+                  {claim.action_taken ? (
+                    <div style={{ fontSize: 14, color: '#1e293b', lineHeight: 1.7, background: claim.action_taken ? '#f0fdf4' : '#f8fafc', padding: '10px 14px', whiteSpace: 'pre-wrap' }}>{claim.action_taken}</div>
+                  ) : claim.status === '완료' ? (
+                    <div style={{ fontSize: 14, color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', padding: '10px 14px' }}>(미입력)</div>
+                  ) : canEdit ? (
+                    <button onClick={() => setEditing(true)} style={{ width: '100%', background: '#f0fdf4', border: 'none', padding: '12px', color: '#16a34a', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+                      + 조치 내용 입력
+                    </button>
+                  ) : (
+                    <div style={{ fontSize: 14, color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', padding: '10px 14px' }}>(미입력)</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
