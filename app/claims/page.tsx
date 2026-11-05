@@ -121,38 +121,8 @@ export default function ClaimsPage() {
     ]
     // 목록 → 상세 하이퍼링크 (거래처 열 C, 각 행에서 상세 시트 해당 행으로)
     for (let i = 0; i < monthClaims.length; i++) {
-      const cellRef = XLSX.utils.encode_cell({ r: i + 1, c: 2 })
-      if (ws1[cellRef]) ws1[cellRef].l = { Target: `#상세!A${i + 2}` }
     }
     XLSX.utils.book_append_sheet(wb, ws1, '목록')
-
-    // ── 상세 시트 (1행 per claim 플랫 테이블) ──
-    const detailHeader = ['No', '날짜', '거래처', '담당자', '연락처', '클레임 유형', '처리 유형', '클레임 내용', '조치 내용', '상태', '완료일시', '등록자']
-    const detailData = monthClaims.map((c, i) => [
-      i + 1,
-      c.claim_date,
-      c.company,
-      c.contact || '',
-      c.phone || '',
-      c.category,
-      c.action_type || '',
-      c.content,
-      c.action_taken || '',
-      c.status,
-      c.resolved_at ? new Date(c.resolved_at).toLocaleDateString('ko-KR') : '',
-      c.profiles?.name || c.profiles?.email || '',
-    ])
-    const ws2 = XLSX.utils.aoa_to_sheet([detailHeader, ...detailData])
-    ws2['!cols'] = [
-      { wch: 4 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 15 },
-      { wch: 8 }, { wch: 12 }, { wch: 45 }, { wch: 35 }, { wch: 8 }, { wch: 14 }, { wch: 12 },
-    ]
-    // 상세 → 목록 하이퍼링크 (거래처 열 C, 각 행에서 목록 시트 해당 행으로)
-    for (let i = 0; i < monthClaims.length; i++) {
-      const cellRef = XLSX.utils.encode_cell({ r: i + 1, c: 2 })
-      if (ws2[cellRef]) ws2[cellRef].l = { Target: `#목록!A${i + 2}` }
-    }
-    XLSX.utils.book_append_sheet(wb, ws2, '상세')
 
     // ── 월별현황 시트 ──
     const allYears = [...new Set(claims.map(c => c.claim_date.substring(0, 4)))].sort()
