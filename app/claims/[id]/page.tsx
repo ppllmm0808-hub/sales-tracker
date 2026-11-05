@@ -17,6 +17,8 @@ const STATUS_STYLE: Record<string, { bg: string; text: string; icon: string }> =
   '완료':  { bg: '#dcfce7', text: '#16a34a', icon: '✅' },
 }
 
+const ACTION_TYPES = ['교환', '반품', '협의완료', '수리', '환불', 'AS처리', '기타']
+
 type Claim = {
   id: string
   user_id: string
@@ -27,6 +29,7 @@ type Claim = {
   category: string
   content: string
   status: string
+  action_type: string | null
   action_taken: string | null
   photos: string[]
   resolved_at: string | null
@@ -64,7 +67,7 @@ export default function ClaimDetailPage() {
   const [token, setToken] = useState('')
 
   const [editing, setEditing] = useState(false)
-  const [editForm, setEditForm] = useState({ company: '', contact: '', phone: '', category: '', content: '', action_taken: '', claim_date: '' })
+  const [editForm, setEditForm] = useState({ company: '', contact: '', phone: '', category: '', content: '', action_type: '', action_taken: '', claim_date: '' })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
@@ -96,8 +99,8 @@ export default function ClaimDetailPage() {
       setClaim(c)
       setEditForm({
         company: c.company, contact: c.contact || '', phone: c.phone || '',
-        category: c.category, content: c.content, action_taken: c.action_taken || '',
-        claim_date: c.claim_date,
+        category: c.category, content: c.content, action_type: c.action_type || '',
+        action_taken: c.action_taken || '', claim_date: c.claim_date,
       })
       setLoading(false)
     })
@@ -263,7 +266,13 @@ export default function ClaimDetailPage() {
               </div>
               <label style={lbl}>연락처<input type="tel" value={editForm.phone} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} style={inp} /></label>
               <label style={lbl}>클레임 내용 *<textarea required value={editForm.content} onChange={e => setEditForm(p => ({ ...p, content: e.target.value }))} style={{ ...inp, height: 80, resize: 'vertical' }} /></label>
-              <label style={lbl}>조치 내용<textarea value={editForm.action_taken} onChange={e => setEditForm(p => ({ ...p, action_taken: e.target.value }))} style={{ ...inp, height: 70, resize: 'vertical' }} placeholder="처리 내용, 조치 결과 등" /></label>
+              <label style={lbl}>처리 유형
+                <select value={editForm.action_type} onChange={e => setEditForm(p => ({ ...p, action_type: e.target.value }))} style={inp}>
+                  <option value="">선택 안 함</option>
+                  {ACTION_TYPES.map(a => <option key={a}>{a}</option>)}
+                </select>
+              </label>
+              <label style={lbl}>조치 내용<textarea value={editForm.action_taken} onChange={e => setEditForm(p => ({ ...p, action_taken: e.target.value }))} style={{ ...inp, height: 70, resize: 'vertical' }} placeholder="교환/반품/수리 등 처리 상세 내용" /></label>
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                 <button type="button" onClick={() => setEditing(false)} style={{ flex: 1, background: '#f1f5f9', border: 'none', borderRadius: 8, padding: 11, color: '#475569', cursor: 'pointer', fontSize: 14 }}>취소</button>
                 <button type="submit" disabled={saving} style={{ flex: 2, background: '#dc2626', border: 'none', borderRadius: 8, padding: 11, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>{saving ? '저장 중...' : '저장'}</button>
@@ -272,8 +281,9 @@ export default function ClaimDetailPage() {
           </div>
         ) : (
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ background: cs.bg, color: cs.text, borderRadius: 6, padding: '3px 12px', fontSize: 12, fontWeight: 700 }}>{claim.category}</span>
+              {claim.action_type && <span style={{ background: '#e0e7ff', color: '#4338ca', borderRadius: 6, padding: '3px 12px', fontSize: 12, fontWeight: 700 }}>🔧 {claim.action_type}</span>}
               {claim.resolved_at && <span style={{ fontSize: 12, color: '#94a3b8' }}>완료: {new Date(claim.resolved_at).toLocaleDateString('ko-KR')}</span>}
             </div>
 

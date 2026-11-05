@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/supabase'
+import * as XLSX from 'xlsx'
 
 const CATEGORIES = ['불량', '배송', 'AS', '계약', '기타']
 const STATUS_LIST = ['전체', '접수', '처리중', '완료']
@@ -31,6 +32,7 @@ type Claim = {
   category: string
   content: string
   status: string
+  action_type: string | null
   action_taken: string | null
   photos: string[]
   resolved_at: string | null
@@ -49,9 +51,12 @@ export default function ClaimsPage() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('전체')
   const [showForm, setShowForm] = useState(false)
+  const [showExport, setShowExport] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [msg, setMsg] = useState('')
   const [isMobile, setIsMobile] = useState(false)
+  const [exportYear, setExportYear] = useState(new Date().getFullYear())
+  const [exportMonth, setExportMonth] = useState(new Date().getMonth() + 1)
   const [form, setForm] = useState({
     company: '', contact: '', phone: '',
     category: '기타', content: '', claim_date: toDateStr(new Date()),
@@ -79,6 +84,74 @@ export default function ClaimsPage() {
       await loadClaims(data.session.access_token)
     })
   }, [router, loadClaims])
+
+  function handleExcelExport() {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const target = `${exportYear}-${pad(exportMonth)}`
+    const monthClaims = claims.filter(c => c.claim_date.startsWith(target))
+
+    if (monthClaims.length === 0) {
+      alert(`${exportYear}년 ${exportMonth}월 클레임이 없습니다.`)
+      return
+    }
+
+    const wb = XLSX.utils.book_new()
+
+    // ── 목록 시트 ──
+    const listHeader = ['No', '날짜', '거래처', '담당자', '연락처', '유형', '처리유형', '클레임 내용', '조치 내용', '상태', '완료일시', '등록자']
+    const listData = monthClaims.map((c, i) => [
+      i + 1,
+      c.claim_date,
+      c.company,
+      c.contact || '',
+      c.phone || '',
+      c.category,
+      c.action_type || '',
+      c.content,
+      c.action_taken || '',
+      c.status,
+      c.resolved_at ? new Date(c.resolved_at).toLocaleDateString('ko-KR') : '',
+      c.profiles?.name || c.profiles?.email || '',
+    ])
+    const ws1 = XLSX.utils.aoa_to_sheet([listHeader, ...listData])
+
+    // 목록 → 상세 시트 하이퍼링크 (거래처 열 C)
+    const detailRowSize = 11  // 상세 시트에서 클레임 1건당 행 수
+    for (let i = 0; i < monthClaims.length; i++) {
+      const cellRef = XLSX.utils.encode_cell({ r: i + 1, c: 2 })
+      if (ws1[cellRef]) ws1[cellRef].l = { Target: `#상세!A${i * detailRowSize + 1}` }
+    }
+    ws1['!cols'] = [
+      { wch: 4 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 15 },
+      { wch: 8 }, { wch: 12 }, { wch: 40 }, { wch: 30 }, { wch: 8 }, { wch: 14 }, { wch: 12 },
+    ]
+    XLSX.utils.book_append_sheet(wb, ws1, '목록')
+
+    // ── 상세 시트 ──
+    const detailRows: (string | number)[][] = []
+    for (let i = 0; i < monthClaims.length; i++) {
+      const c = monthClaims[i]
+      detailRows.push([`[${i + 1}] ${c.company}  (${c.claim_date})`])
+      detailRows.push(['거래처', c.company, '날짜', c.claim_date])
+      detailRows.push(['담당자', c.contact || '-', '연락처', c.phone || '-'])
+      detailRows.push(['클레임 유형', c.category, '처리 유형', c.action_type || '-'])
+      detailRows.push(['상태', c.status, '완료일시', c.resolved_at ? new Date(c.resolved_at).toLocaleDateString('ko-KR') : '-'])
+      detailRows.push(['등록자', c.profiles?.name || c.profiles?.email || '-', '', ''])
+      detailRows.push(['클레임 내용', c.content, '', ''])
+      detailRows.push(['조치 내용', c.action_taken || '-', '', ''])
+      if (c.photos?.length > 0) {
+        detailRows.push(['사진 URL', c.photos.join(', '), '', ''])
+      }
+      detailRows.push([''])
+      detailRows.push([''])
+    }
+    const ws2 = XLSX.utils.aoa_to_sheet(detailRows)
+    ws2['!cols'] = [{ wch: 12 }, { wch: 45 }, { wch: 12 }, { wch: 20 }]
+    XLSX.utils.book_append_sheet(wb, ws2, '상세')
+
+    XLSX.writeFile(wb, `클레임_${exportYear}년${pad(exportMonth)}월.xlsx`)
+    setShowExport(false)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -134,6 +207,7 @@ export default function ClaimsPage() {
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
             <button onClick={() => { setShowForm(true); setMsg('') }} style={{ background: '#fff', border: 'none', borderRadius: 8, padding: isMobile ? '5px 12px' : '6px 16px', color: '#dc2626', cursor: 'pointer', fontSize: isMobile ? 12 : 13, fontWeight: 700, whiteSpace: 'nowrap' }}>+ 등록</button>
+            <button onClick={() => setShowExport(true)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>📊 엑셀</button>
             <button onClick={() => router.push('/dashboard')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>일지</button>
             {isAdmin && (
               <button onClick={() => router.push('/admin')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 14px', color: '#fff', cursor: 'pointer', fontSize: isMobile ? 12 : 13, whiteSpace: 'nowrap' }}>관리자</button>
@@ -244,6 +318,32 @@ export default function ClaimsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 엑셀 내보내기 모달 */}
+      {showExport && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 360, padding: 24 }}>
+            <div style={{ fontWeight: 700, fontSize: 17, color: '#0f172a', marginBottom: 6 }}>📊 월별 Excel 내보내기</div>
+            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>목록 시트 + 상세 시트로 저장됩니다</div>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+              <label style={lbl}>연도
+                <select value={exportYear} onChange={e => setExportYear(Number(e.target.value))} style={inp}>
+                  {[2024, 2025, 2026, 2027].map(y => <option key={y}>{y}</option>)}
+                </select>
+              </label>
+              <label style={lbl}>월
+                <select value={exportMonth} onChange={e => setExportMonth(Number(e.target.value))} style={inp}>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}월</option>)}
+                </select>
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowExport(false)} style={{ flex: 1, background: '#f1f5f9', border: 'none', borderRadius: 10, padding: 12, color: '#475569', cursor: 'pointer', fontSize: 14 }}>취소</button>
+              <button onClick={handleExcelExport} style={{ flex: 2, background: '#16a34a', border: 'none', borderRadius: 10, padding: 12, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 15 }}>📥 다운로드</button>
+            </div>
           </div>
         </div>
       )}
