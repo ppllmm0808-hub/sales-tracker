@@ -147,10 +147,15 @@ export default function ClaimDetailPage() {
       const updated = await res.json()
       setClaim(updated)
       setEditing(false)
-      // 직접입력이면 editForm도 업데이트
-      if (editForm.action_type === '직접입력') {
-        setEditForm(p => ({ ...p, action_type: '직접입력' }))
-      }
+      // editForm을 서버 응답 기준으로 동기화
+      const updIsCustom = updated.action_type && !['교환', '반품', '협의완료', '수리', '환불', 'AS처리', '기타'].includes(updated.action_type)
+      if (updIsCustom) setCustomActionType(updated.action_type)
+      else setCustomActionType('')
+      setEditForm(p => ({
+        ...p,
+        action_taken: updated.action_taken || '',
+        action_type: updIsCustom ? '직접입력' : (updated.action_type || ''),
+      }))
       setMsg(hasAction ? '✅ 저장됐습니다 — 완료 처리됐습니다' : '✅ 저장됐습니다')
     } else {
       const d = await res.json()
@@ -277,8 +282,8 @@ export default function ClaimDetailPage() {
           <div style={{ background: msg.startsWith('✅') ? '#f0fdf4' : '#fef2f2', border: `1px solid ${msg.startsWith('✅') ? '#86efac' : '#fca5a5'}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, color: msg.startsWith('✅') ? '#15803d' : '#dc2626' }}>{msg}</div>
         )}
 
-        {/* 상태 변경 버튼 */}
-        {canEdit && (
+        {/* 상태 변경 버튼 — 편집 모드에서는 숨김 (저장 후 자동 반영) */}
+        {canEdit && !editing && (
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '16px' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10 }}>처리 상태 변경</div>
             <div style={{ display: 'flex', gap: 8 }}>
