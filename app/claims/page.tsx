@@ -147,25 +147,53 @@ export default function ClaimsPage() {
         ])
       }
     }
-    // 월별 텍스트 바 차트 (데이터 아래에 추가)
+    // 월별 텍스트 바 차트
     const maxTotal = Math.max(...summaryData.map(r => r[1] as number), 1)
-    const BAR_WIDTH = 20
+    const BAR_WIDTH = 24
     const chartRows: (string | number)[][] = [
       [''],
-      ['── 월별 클레임 건수 차트 ──'],
-      ['월', '건수', '그래프 (■=완료  □=미완료)'],
+      ['[ 월별 클레임 현황 차트 ]  ■=완료  □=처리중  ▪=접수'],
+      ['월', '총계', '완료', '처리중', '접수', '그래프'],
     ]
     for (const row of summaryData) {
       const total = row[1] as number
       const done = row[4] as number
-      const filled = Math.round((total / maxTotal) * BAR_WIDTH)
-      const doneFilled = Math.round((done / maxTotal) * BAR_WIDTH)
-      const bar = '■'.repeat(doneFilled) + '□'.repeat(filled - doneFilled) + '·'.repeat(BAR_WIDTH - filled)
-      chartRows.push([row[0], total, bar])
+      const ing = row[3] as number
+      const wait = row[2] as number
+      const doneFill = Math.round((done / maxTotal) * BAR_WIDTH)
+      const ingFill = Math.round((ing / maxTotal) * BAR_WIDTH)
+      const waitFill = Math.round((wait / maxTotal) * BAR_WIDTH)
+      const bar = '■'.repeat(doneFill) + '□'.repeat(ingFill) + '▪'.repeat(waitFill) + '·'.repeat(Math.max(0, BAR_WIDTH - doneFill - ingFill - waitFill))
+      chartRows.push([row[0], total, done, ing, wait, bar])
     }
     const ws3 = XLSX.utils.aoa_to_sheet([summaryHeader, ...summaryData, ...chartRows])
     ws3['!cols'] = [{ wch: 10 }, { wch: 8 }, { wch: 7 }, { wch: 7 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }]
     XLSX.utils.book_append_sheet(wb, ws3, '월별현황')
+
+    // ── 업체별 현황 시트 ──
+    const companyMap: Record<string, { total: number; 접수: number; 처리중: number; 완료: number; categories: Record<string, number>; lastDate: string }> = {}
+    for (const c of claims) {
+      if (!companyMap[c.company]) companyMap[c.company] = { total: 0, 접수: 0, 처리중: 0, 완료: 0, categories: {}, lastDate: '' }
+      const e = companyMap[c.company]
+      e.total++
+      e[c.status as '접수' | '처리중' | '완료']++
+      e.categories[c.category] = (e.categories[c.category] || 0) + 1
+      if (!e.lastDate || c.claim_date > e.lastDate) e.lastDate = c.claim_date
+    }
+    const sortedCompanies = Object.entries(companyMap).sort((a, b) => b[1].total - a[1].total)
+    const companyHeader = ['업체명', '총건수', '접수', '처리중', '완료', '처리율', '주요유형', '최근일자', '그래프']
+    const companyData = sortedCompanies.map(([name, v]) => {
+      const rate = v.total > 0 ? Math.round((v.완료 / v.total) * 100) : 0
+      const topCat = Object.entries(v.categories).sort((a, b) => b[1] - a[1])[0]?.[0] || ''
+      const maxC = Math.max(...sortedCompanies.map(([, x]) => x.total), 1)
+      const barLen = Math.round((v.total / maxC) * 20)
+      const doneLen = Math.round((v.완료 / maxC) * 20)
+      const bar = '■'.repeat(doneLen) + '□'.repeat(Math.max(0, barLen - doneLen))
+      return [name, v.total, v.접수, v.처리중, v.완료, `${rate}%`, topCat, v.lastDate, bar]
+    })
+    const ws4 = XLSX.utils.aoa_to_sheet([companyHeader, ...companyData])
+    ws4['!cols'] = [{ wch: 20 }, { wch: 7 }, { wch: 6 }, { wch: 7 }, { wch: 6 }, { wch: 7 }, { wch: 10 }, { wch: 12 }, { wch: 24 }]
+    XLSX.utils.book_append_sheet(wb, ws4, '업체별현황')
 
     XLSX.writeFile(wb, `클레임_${exportYear}년${pad(exportMonth)}월.xlsx`)
     setShowExport(false)
