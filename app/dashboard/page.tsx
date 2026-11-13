@@ -203,6 +203,7 @@ export default function Dashboard() {
   const [timerStart, setTimerStart] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const lastAlarmRef = useRef(0)
   const logRef = useRef<SalesLog | null>(null)
   const selectedDateRef = useRef(toDateStr(new Date()))
   const [form, setForm] = useState({
@@ -259,6 +260,30 @@ export default function Dashboard() {
     }
   }, [profile?.id])
 
+  // 페이지 복귀 시 localStorage 타이머 복원
+  useEffect(() => {
+    const savedEpoch = localStorage.getItem('timerStartAt')
+    const savedLabel = localStorage.getItem('timerStartLabel')
+    if (savedEpoch && savedLabel) {
+      const epoch = Number(savedEpoch)
+      const today = toDateStr(new Date())
+      const startDate = new Date(epoch)
+      const startDay = `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-${String(startDate.getDate()).padStart(2,'0')}`
+      if (startDay !== today) {
+        // 날짜가 바뀐 경우 타이머 삭제
+        localStorage.removeItem('timerStartAt')
+        localStorage.removeItem('timerStartLabel')
+        return
+      }
+      setTimerStart(savedLabel)
+      startTimerInterval(epoch)
+    }
+    return () => {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) { router.push('/login'); return }
@@ -276,11 +301,44 @@ export default function Dashboard() {
     return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`
   }
 
+  function requestNotificationPermission() {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }
+
+  function triggerHourAlarm(hours: number) {
+    const msg = `⏰ 활동 ${hours}시간 경과 — 활동 종료 후 기록을 저장하세요`
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification('영업활동 타이머', { body: msg, icon: '/favicon.ico' })
+    } else {
+      alert(msg)
+    }
+  }
+
+  function startTimerInterval(startEpoch: number) {
+    if (timerRef.current) clearInterval(timerRef.current)
+    lastAlarmRef.current = Math.floor((Date.now() - startEpoch) / 3_600_000)
+    timerRef.current = setInterval(() => {
+      const secs = Math.floor((Date.now() - startEpoch) / 1000)
+      setElapsed(secs)
+      const hrs = Math.floor(secs / 3600)
+      if (hrs > 0 && hrs > lastAlarmRef.current) {
+        lastAlarmRef.current = hrs
+        triggerHourAlarm(hrs)
+      }
+    }, 1000)
+  }
+
   function startTimer() {
     const time = nowTime()
+    const epoch = Date.now()
     setTimerStart(time)
     setElapsed(0)
-    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
+    localStorage.setItem('timerStartAt', String(epoch))
+    localStorage.setItem('timerStartLabel', time)
+    requestNotificationPermission()
+    startTimerInterval(epoch)
     // GPS 자동 캡처 (백그라운드)
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(async (pos) => {
@@ -301,6 +359,8 @@ export default function Dashboard() {
 
   function stopTimer() {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+    localStorage.removeItem('timerStartAt')
+    localStorage.removeItem('timerStartLabel')
     const endTime = nowTime()
     setEditTarget(null)
     setFormCoords(null)
