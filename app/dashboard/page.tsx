@@ -204,6 +204,7 @@ export default function Dashboard() {
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const lastAlarmRef = useRef(0)
+  const [alarmMsg, setAlarmMsg] = useState('')
   const logRef = useRef<SalesLog | null>(null)
   const selectedDateRef = useRef(toDateStr(new Date()))
   const [form, setForm] = useState({
@@ -307,13 +308,19 @@ export default function Dashboard() {
     }
   }
 
-  function triggerHourAlarm(hours: number) {
+  async function triggerHourAlarm(hours: number) {
     const msg = `⏰ 활동 ${hours}시간 경과 — 활동 종료 후 기록을 저장하세요`
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      new Notification('영업활동 타이머', { body: msg, icon: '/favicon.ico' })
-    } else {
-      alert(msg)
-    }
+    setAlarmMsg(msg)
+    try { navigator.vibrate?.([300, 150, 300]) } catch {}
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    try {
+      const reg = await navigator.serviceWorker?.ready
+      if (reg) {
+        await reg.showNotification('영업활동 타이머', { body: msg, icon: '/icon-192.png', tag: 'timer-alarm' })
+        return
+      }
+    } catch {}
+    try { new Notification('영업활동 타이머', { body: msg, icon: '/icon-192.png' }) } catch {}
   }
 
   function startTimerInterval(startEpoch: number) {
@@ -366,6 +373,7 @@ export default function Dashboard() {
     setFormCoords(null)
     setForm({ activity_time: timerStart || nowTime(), end_time: endTime, activity_type: '미팅', company: '', contact: '', address: '', content: '', result: '', next_action: '' })
     setTimerStart(null)
+    setAlarmMsg('')
     setElapsed(0)
     setShowModal(true)
   }
@@ -711,6 +719,11 @@ export default function Dashboard() {
               <div style={{ fontSize: 36, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: 2, marginBottom: 16 }}>
                 {String(Math.floor(elapsed / 3600)).padStart(2,'0')}:{String(Math.floor((elapsed % 3600) / 60)).padStart(2,'0')}:{String(elapsed % 60).padStart(2,'0')}
               </div>
+              {alarmMsg && (
+                <div onClick={() => setAlarmMsg('')} style={{ background: '#fff', color: '#b91c1c', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 600, marginBottom: 12, cursor: 'pointer' }}>
+                  {alarmMsg} <span style={{ fontWeight: 400, color: '#94a3b8' }}>(탭하여 닫기)</span>
+                </div>
+              )}
               <button onClick={stopTimer} style={{
                 width: '100%', background: '#fff', border: 'none', borderRadius: 10, padding: '12px',
                 color: '#dc2626', fontSize: 15, fontWeight: 700, cursor: 'pointer',
