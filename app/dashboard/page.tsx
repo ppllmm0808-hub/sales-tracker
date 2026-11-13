@@ -205,6 +205,7 @@ export default function Dashboard() {
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const lastAlarmRef = useRef(0)
   const [alarmMsg, setAlarmMsg] = useState('')
+  const [pendingStop, setPendingStop] = useState(false)
   const logRef = useRef<SalesLog | null>(null)
   const selectedDateRef = useRef(toDateStr(new Date()))
   const [form, setForm] = useState({
@@ -391,26 +392,37 @@ export default function Dashboard() {
     } catch {}
   }
 
-  function stopTimer() {
+  function finishTimer() {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
-    let saved: { lat: number; lng: number; address: string } | null = null
-    try { saved = JSON.parse(localStorage.getItem('timerGps') || 'null') } catch {}
     localStorage.removeItem('timerStartAt')
     localStorage.removeItem('timerStartLabel')
     localStorage.removeItem('timerGps')
+    setTimerStart(null)
+    setAlarmMsg('')
+    setElapsed(0)
+    setPendingStop(false)
+  }
+
+  function stopTimer() {
+    let saved: { lat: number; lng: number; address: string } | null = null
+    try { saved = JSON.parse(localStorage.getItem('timerGps') || 'null') } catch {}
     const endTime = nowTime()
     const coords = saved ? { lat: saved.lat, lng: saved.lng } : formCoords
     setEditTarget(null)
     setFormCoords(coords)
     setForm({ activity_time: timerStart || nowTime(), end_time: endTime, activity_type: '미팅', company: '', contact: '', address: saved?.address || '', content: '', result: '', next_action: '' })
-    setTimerStart(null)
-    setAlarmMsg('')
-    setElapsed(0)
+    setPendingStop(true)
     setShowModal(true)
     if (!coords) captureGPS(true)
   }
 
+  function closeModal() {
+    if (pendingStop && !confirm('⚠️ 아직 저장하지 않았습니다.\n[저장하기]를 눌러야 활동이 기록됩니다.\n\n저장하지 않고 닫으면 타이머는 계속 유지됩니다. 닫으시겠습니까?')) return
+    setShowModal(false)
+  }
+
   function openAdd() {
+    setPendingStop(false)
     setEditTarget(null)
     setFormCoords(null)
     setForm({ activity_time: nowTime(), end_time: '', activity_type: '미팅', company: '', contact: '', address: '', content: '', result: '', next_action: '' })
@@ -418,6 +430,7 @@ export default function Dashboard() {
   }
 
   function openEdit(act: Activity) {
+    setPendingStop(false)
     setEditTarget(act)
     setFormCoords(act.lat && act.lng ? { lat: act.lat, lng: act.lng } : null)
     setForm({
@@ -474,6 +487,7 @@ export default function Dashboard() {
       })
     }
     setShowModal(false)
+    if (pendingStop) finishTimer()
     await load(profile.id, selectedDate)
   }
 
@@ -923,7 +937,7 @@ export default function Dashboard() {
           <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', width: '100%', maxWidth: 520, overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ background: '#4f46e5', color: '#fff', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 700, fontSize: 16 }}>💼 {editTarget ? '영업 활동 수정' : '영업 활동 등록'}</span>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>✕</button>
+              <button onClick={closeModal} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>✕</button>
             </div>
             <form onSubmit={handleSave} style={{ padding: isMobile ? '16px' : '24px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14, overflowY: 'auto', flex: 1 }}>
               <label style={lbl}>시작 시간 *<input type="time" required value={form.activity_time} onChange={e => setForm(p => ({ ...p, activity_time: e.target.value }))} style={inp} /></label>
@@ -954,7 +968,7 @@ export default function Dashboard() {
               <label style={lbl}>결과<input type="text" value={form.result} onChange={e => setForm(p => ({ ...p, result: e.target.value }))} style={inp} placeholder="계약/검토중/보류 등" /></label>
               <label style={{ ...lbl, gridColumn: '1/-1' }}>비고 / 다음 액션 플랜<input type="text" value={form.next_action} onChange={e => setForm(p => ({ ...p, next_action: e.target.value }))} style={inp} placeholder="다음 방문 일정, 후속 조치, 준비 사항 등" /></label>
               <div style={{ gridColumn: '1/-1', display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
-                <button type="button" onClick={() => setShowModal(false)} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 20px', color: '#475569', cursor: 'pointer' }}>취소</button>
+                <button type="button" onClick={closeModal} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 20px', color: '#475569', cursor: 'pointer' }}>취소</button>
                 <button type="submit" style={{ background: '#4f46e5', border: 'none', borderRadius: 8, padding: '10px 28px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 15 }}>저장하기</button>
               </div>
             </form>
