@@ -325,11 +325,11 @@ export default function Dashboard() {
 
   function startTimerInterval(startEpoch: number) {
     if (timerRef.current) clearInterval(timerRef.current)
-    lastAlarmRef.current = Math.floor((Date.now() - startEpoch) / 60_000) // 테스트: 1분 단위
+    lastAlarmRef.current = Math.floor((Date.now() - startEpoch) / 3_600_000)
     timerRef.current = setInterval(() => {
       const secs = Math.floor((Date.now() - startEpoch) / 1000)
       setElapsed(secs)
-      const hrs = Math.floor(secs / 60) // 테스트: 1분마다 알람
+      const hrs = Math.floor(secs / 3600)
       if (hrs > 0 && hrs > lastAlarmRef.current) {
         lastAlarmRef.current = hrs
         triggerHourAlarm(hrs)
