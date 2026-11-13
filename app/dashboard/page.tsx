@@ -278,6 +278,11 @@ export default function Dashboard() {
       }
       setTimerStart(savedLabel)
       startTimerInterval(epoch)
+      try {
+        const g = JSON.parse(localStorage.getItem('timerGps') || 'null')
+        if (g) setFormCoords({ lat: g.lat, lng: g.lng })
+        else captureStartGps(epoch)
+      } catch {}
     }
     return () => {
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
@@ -346,36 +351,63 @@ export default function Dashboard() {
     localStorage.setItem('timerStartLabel', time)
     requestNotificationPermission()
     startTimerInterval(epoch)
-    // GPS 자동 캡처 (백그라운드)
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const { latitude: lat, longitude: lng } = pos.coords
-        setFormCoords({ lat, lng })
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ko`, { headers: { 'User-Agent': 'SalesTracker/1.0' } })
-          const data = await res.json()
-          if (data?.address) {
-            const a = data.address
-            const addr = [a.city || a.county, a.city_district || a.borough, a.road].filter(Boolean).join(' ') || data.display_name.split(',').slice(0, 3).join(',').trim()
-            setForm(p => ({ ...p, address: addr }))
-          }
-        } catch {}
-      }, () => {}, { enableHighAccuracy: true, timeout: 8000 })
+    localStorage.removeItem('timerGps')
+    captureStartGps(epoch)
+  }
+
+  async function getPosition(): Promise<GeolocationPosition> {
+    const get = (opts: PositionOptions) => new Promise<GeolocationPosition>((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, opts))
+    try {
+      return await get({ enableHighAccuracy: true, timeout: 10000 })
+    } catch (e: any) {
+      if (e?.code === 1) throw e
+      return await get({ enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 })
     }
+  }
+
+  async function reverseGeocode(lat: number, lng: number): Promise<string> {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ko`, { headers: { 'User-Agent': 'SalesTracker/1.0' } })
+      const data = await res.json()
+      const a = data?.address
+      const short = [a?.city || a?.county, a?.city_district || a?.borough, a?.road].filter(Boolean).join(' ')
+      return short || (data?.display_name ? data.display_name.split(',').slice(0, 3).join(',').trim() : '')
+    } catch { return '' }
+  }
+
+  async function captureStartGps(epoch: number) {
+    if (!navigator.geolocation) return
+    try {
+      const pos = await getPosition()
+      const { latitude: lat, longitude: lng } = pos.coords
+      setFormCoords({ lat, lng })
+      const stillRunning = () => localStorage.getItem('timerStartAt') === String(epoch)
+      if (stillRunning()) localStorage.setItem('timerGps', JSON.stringify({ lat, lng, address: '' }))
+      const address = await reverseGeocode(lat, lng)
+      if (address) {
+        if (stillRunning()) localStorage.setItem('timerGps', JSON.stringify({ lat, lng, address }))
+        setForm(p => ({ ...p, address: p.address || address }))
+      }
+    } catch {}
   }
 
   function stopTimer() {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+    let saved: { lat: number; lng: number; address: string } | null = null
+    try { saved = JSON.parse(localStorage.getItem('timerGps') || 'null') } catch {}
     localStorage.removeItem('timerStartAt')
     localStorage.removeItem('timerStartLabel')
+    localStorage.removeItem('timerGps')
     const endTime = nowTime()
+    const coords = saved ? { lat: saved.lat, lng: saved.lng } : formCoords
     setEditTarget(null)
-    setFormCoords(null)
-    setForm({ activity_time: timerStart || nowTime(), end_time: endTime, activity_type: '미팅', company: '', contact: '', address: '', content: '', result: '', next_action: '' })
+    setFormCoords(coords)
+    setForm({ activity_time: timerStart || nowTime(), end_time: endTime, activity_type: '미팅', company: '', contact: '', address: saved?.address || '', content: '', result: '', next_action: '' })
     setTimerStart(null)
     setAlarmMsg('')
     setElapsed(0)
     setShowModal(true)
+    if (!coords) captureGPS(true)
   }
 
   function openAdd() {
@@ -398,29 +430,22 @@ export default function Dashboard() {
     setShowModal(true)
   }
 
-  async function captureGPS() {
-    if (!navigator.geolocation) { alert('이 브라우저는 GPS를 지원하지 않습니다.'); return }
+  async function captureGPS(silent = false) {
+    if (!navigator.geolocation) { if (!silent) alert('이 브라우저는 GPS를 지원하지 않습니다.'); return }
     setGpsLoading(true)
-    navigator.geolocation.getCurrentPosition(async (pos) => {
+    try {
+      const pos = await getPosition()
       const { latitude: lat, longitude: lng } = pos.coords
       setFormCoords({ lat, lng })
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ko`, {
-          headers: { 'User-Agent': 'SalesTracker/1.0' }
-        })
-        const data = await res.json()
-        if (data?.display_name) {
-          const addr = data.address
-          const short = [addr?.city || addr?.county, addr?.city_district || addr?.borough, addr?.road].filter(Boolean).join(' ')
-          setForm(p => ({ ...p, address: short || data.display_name.split(',').slice(0, 3).join(',').trim() }))
-        }
-      } catch {}
-      setGpsLoading(false)
-    }, (err) => {
-      setGpsLoading(false)
-      if (err.code === 1) alert('위치 권한을 허용해주세요.\n브라우저 주소창 왼쪽 자물쇠 아이콘을 클릭하세요.')
-      else alert('GPS 위치를 가져올 수 없습니다.')
-    }, { enableHighAccuracy: true, timeout: 10000 })
+      const address = await reverseGeocode(lat, lng)
+      if (address) setForm(p => ({ ...p, address }))
+    } catch (err: any) {
+      if (!silent) {
+        if (err?.code === 1) alert('위치 권한을 허용해주세요.\n브라우저 주소창 왼쪽 자물쇠 아이콘을 클릭하세요.')
+        else alert('GPS 위치를 가져올 수 없습니다.')
+      }
+    }
+    setGpsLoading(false)
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -912,7 +937,7 @@ export default function Dashboard() {
               <label style={{ ...lbl, gridColumn: '1/-1' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>방문 위치 (주소/도시명)</span>
-                  <button type="button" onClick={captureGPS} disabled={gpsLoading} style={{
+                  <button type="button" onClick={() => captureGPS()} disabled={gpsLoading} style={{
                     background: formCoords ? '#dcfce7' : '#ede9fe',
                     border: `1px solid ${formCoords ? '#86efac' : '#a5b4fc'}`,
                     borderRadius: 6, padding: '2px 7px',
