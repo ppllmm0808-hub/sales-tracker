@@ -343,7 +343,15 @@ export default function Dashboard() {
     }, 1000)
   }
 
+  function requireCheckIn() {
+    if (log?.check_in_time || selectedDate !== toDateStr(new Date())) return true
+    alert('⚠️ 먼저 [지금 출근 체크인]을 눌러주세요.\n출근 체크인 후에 활동을 기록할 수 있습니다.')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    return false
+  }
+
   function startTimer() {
+    if (!requireCheckIn()) return
     const time = nowTime()
     const epoch = Date.now()
     setTimerStart(time)
@@ -422,6 +430,7 @@ export default function Dashboard() {
   }
 
   function openAdd() {
+    if (!requireCheckIn()) return
     setPendingStop(false)
     setEditTarget(null)
     setFormCoords(null)
