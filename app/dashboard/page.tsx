@@ -206,6 +206,7 @@ export default function Dashboard() {
   const lastAlarmRef = useRef(0)
   const [alarmMsg, setAlarmMsg] = useState('')
   const [pendingStop, setPendingStop] = useState(false)
+  const [pushState, setPushState] = useState<'unsupported' | 'off' | 'on'>('unsupported')
   const logRef = useRef<SalesLog | null>(null)
   const selectedDateRef = useRef(toDateStr(new Date()))
   const [form, setForm] = useState({
@@ -260,6 +261,19 @@ export default function Dashboard() {
       clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisible)
     }
+  }, [profile?.id])
+
+  // 푸시 구독 상태 확인 (이미 구독했으면 서버에 최신 정보 재등록)
+  useEffect(() => {
+    if (!profile || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return
+    if (typeof Notification === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+    setPushState('off')
+    if (Notification.permission !== 'granted') return
+    navigator.serviceWorker.ready.then(async reg => {
+      const sub = await reg.pushManager.getSubscription()
+      if (sub && await savePushSubscription(sub)) setPushState('on')
+    }).catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id])
 
   // 페이지 복귀 시 localStorage 타이머 복원
@@ -341,6 +355,36 @@ export default function Dashboard() {
         triggerHourAlarm(hrs)
       }
     }, 1000)
+  }
+
+  async function savePushSubscription(sub: PushSubscription) {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (!token) return false
+    const res = await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(sub.toJSON()),
+    })
+    return res.ok
+  }
+
+  async function enablePush() {
+    const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    if (!vapid) { alert('알림 설정이 아직 완료되지 않았습니다. 관리자에게 문의하세요.'); return }
+    try {
+      const perm = await Notification.requestPermission()
+      if (perm !== 'granted') { alert('알림이 차단되어 있습니다.\n브라우저(또는 앱) 설정에서 알림을 허용해주세요.'); return }
+      const reg = await navigator.serviceWorker.ready
+      const pad = '='.repeat((4 - (vapid.length % 4)) % 4)
+      const raw = atob((vapid + pad).replace(/-/g, '+').replace(/_/g, '/'))
+      const key = Uint8Array.from(raw, c => c.charCodeAt(0))
+      const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key })
+      if (await savePushSubscription(sub)) { setPushState('on'); alert('✅ 평일 아침 8시에 출근 체크인 알림이 옵니다.') }
+      else alert('알림 등록에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    } catch {
+      alert('이 기기/브라우저에서는 푸시 알림을 지원하지 않습니다.\n(아이폰은 홈 화면에 앱을 추가한 뒤 사용해야 합니다)')
+    }
   }
 
   function requireCheckIn() {
@@ -663,6 +707,13 @@ export default function Dashboard() {
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '16px 12px' : '24px 16px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '320px 1fr', gap: isMobile ? 12 : 20 }}>
         {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {pushState === 'off' && (
+            <button onClick={enablePush} style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 12, padding: '12px 14px', color: '#92400e', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}>
+              🔔 아침 8시 출근 알림 받기
+              <div style={{ fontWeight: 400, fontSize: 11, marginTop: 2 }}>탭해서 알림을 허용하세요. 앱을 닫아도 알림이 옵니다.</div>
+            </button>
+          )}
 
           {/* Check-in Card */}
           <div style={{

@@ -40,3 +40,28 @@ self.addEventListener('fetch', (event) => {
     )
   }
 })
+
+// 웹 푸시 수신 (출근 알림 등)
+self.addEventListener('push', (event) => {
+  let data = {}
+  try { data = event.data ? event.data.json() : {} } catch {}
+  event.waitUntil(
+    self.registration.showNotification(data.title || '영업활동일지', {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      tag: 'checkin-reminder',
+      data: { url: data.url || '/dashboard' },
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = (event.notification.data && event.notification.data.url) || '/dashboard'
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const c of list) { if ('focus' in c) { c.navigate(url); return c.focus() } }
+      return self.clients.openWindow(url)
+    })
+  )
+})
